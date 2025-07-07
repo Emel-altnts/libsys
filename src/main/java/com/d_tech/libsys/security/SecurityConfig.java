@@ -52,8 +52,13 @@ public class SecurityConfig {
                 ))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Auth işlemleri herkese açık (login, signup, kullanıcı adı kontrolü)
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Kitap listeleme ve görüntüleme herkese açık
                         .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
+                        // Ana sayfa mesajı herkese açık
+                        .requestMatchers("/message").permitAll()
+                        // Diğer tüm istekler authentication gerektirir
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authProvider)

@@ -2,8 +2,11 @@ package com.d_tech.libsys.controller;
 
 import com.d_tech.libsys.dto.AuthRequest;
 import com.d_tech.libsys.dto.AuthResponse;
+import com.d_tech.libsys.dto.SignupRequest;
+import com.d_tech.libsys.dto.SignupResponse;
 import com.d_tech.libsys.security.JwtUtil;
 import com.d_tech.libsys.security.UserDetailsServiceImpl;
+import com.d_tech.libsys.service.UserService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,7 +18,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Authentication controller - kullanıcı giriş işlemlerini yönetir
+ * Authentication controller - kullanıcı giriş ve kayıt işlemlerini yönetir
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -25,6 +28,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
+    private final UserService userService;
 
     /**
      * Kullanıcı giriş endpoint'i
@@ -64,5 +68,44 @@ public class AuthController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Login failed");
         }
+    }
+
+    /**
+     * Kullanıcı kayıt endpoint'i
+     */
+    @PostMapping("/signup")
+    public ResponseEntity<SignupResponse> signup(@RequestBody SignupRequest request) {
+        try {
+            // Debug için log ekle
+            System.out.println("Signup attempt for username: " + request.getUsername());
+
+            // Kayıt işlemini gerçekleştir
+            SignupResponse response = userService.registerUser(request);
+
+            // Başarı durumunu kontrol et
+            if (response.getMessage().contains("başarıyla")) {
+                System.out.println("User successfully registered: " + request.getUsername());
+                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            } else {
+                // Kayıt başarısız (validasyon hatası vs.)
+                System.out.println("Signup failed for username: " + request.getUsername() + " - " + response.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+        } catch (Exception e) {
+            System.out.println("Signup error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new SignupResponse("Kayıt işlemi sırasında beklenmeyen bir hata oluştu!"));
+        }
+    }
+
+    /**
+     * Kullanıcı adı kontrol endpoint'i (opsiyonel - frontend için kullanışlı)
+     */
+    @GetMapping("/check-username/{username}")
+    public ResponseEntity<Boolean> checkUsername(@PathVariable String username) {
+        boolean exists = userService.existsByUsername(username);
+        return ResponseEntity.ok(exists);
     }
 }
