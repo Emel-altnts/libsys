@@ -75,7 +75,6 @@ public class JwtUtil {
     public String extractUsername(String token) {
         return parseToken(token).getBody().getSubject();
     }
-
     /**
      * Token'ı genel geçerlilik açısından kontrol eder:
      * - İmza doğru mu
