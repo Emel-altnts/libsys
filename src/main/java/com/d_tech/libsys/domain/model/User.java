@@ -2,6 +2,7 @@ package com.d_tech.libsys.domain.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.Set;
 
 @Entity
 @Data
@@ -20,6 +21,9 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    private String role; // örnek: ROLE_USER, ROLE_ADMIN
+    // Tek bir role değil, roller set olarak tutuluyor
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "role")
+    private Set<String> roles;
 }
-

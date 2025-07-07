@@ -1,30 +1,32 @@
 package com.d_tech.libsys.repository;
 
-import com.d_tech.libsys.domain.model.User; // Veritabanındaki kullanıcıyı temsil eden entity
+import com.d_tech.libsys.domain.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 /**
- * UserRepository, User entity'si için CRUD işlemlerini sağlayan bir Spring Data JPA arayüzüdür.
- *
- * JpaRepository<User, Long>:
- * - User: Entity tipi
- * - Long: User entity'sindeki ID alanının veri tipi
- *
- * Spring otomatik olarak bu interface için çalışma zamanında implementasyon oluşturur.
- * Ekstra SQL yazmadan veri çekme, kaydetme, silme gibi işlemler yapılabilir.
+ * UserRepository interface'i, User entity'si için veritabanı işlemlerini sağlar.
+ * Spring Data JPA tarafından otomatik olarak implement edilir.
  */
+@Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
     /**
      * Kullanıcı adına göre kullanıcıyı bulur.
-     * Spring Data JPA, method ismine göre otomatik SQL sorgusu oluşturur.
+     * Authentication sürecinde kullanılır.
      *
-     * @param username Kullanıcı adı (unique olmalı)
-     * @return Kullanıcı bulunduysa Optional<User>, bulunamadıysa boş
+     * @param username Aranacak kullanıcı adı
+     * @return Kullanıcı bulunursa Optional<User>, bulunamazsa Optional.empty()
      */
     Optional<User> findByUsername(String username);
+
+    /**
+     * Kullanıcı adının sistemde var olup olmadığını kontrol eder.
+     *
+     * @param username Kontrol edilecek kullanıcı adı
+     * @return Varsa true, yoksa false
+     */
+    boolean existsByUsername(String username);
 }
-
-
