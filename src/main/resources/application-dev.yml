@@ -1,13 +1,32 @@
 spring:
+  # PostgreSQL Veritabanı Yapılandırması
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  # JPA/Hibernate Yapılandırması
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update  # Tabloları otomatik oluştur/güncelle
+    show-sql: true      # SQL sorgularını konsola yazdır
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Server Port Yapılandırması
+  server:
+    port: 9090  # Ana uygulama portu
+
+  # Kafka Yapılandırması (Port düzeltmesi)
   kafka:
-    group-id: project-api
-    bootstrap-servers: localhost:19081
-
-
+    bootstrap-servers: localhost:9092  # Doğru port
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      acks: 1  # 'all' yerine '1' kullanın (tek broker için)
+      acks: 1
       retries: 3
       retry-backoff-ms: 1000
       request-timeout-ms: 30000
@@ -30,6 +49,19 @@ spring:
 
     listener:
       ack-mode: manual_immediate
-      concurrency: 1  # İlk teste için 1 yapın
+      concurrency: 1
       poll-timeout: 3000
-      missing-topics-fatal: false  # Topic yoksa hata vermesin
+      missing-topics-fatal: false
+
+# Uygulama özel yapılandırmaları
+app:
+  kafka:
+    topic:
+      user-registration: user-registration-topic
+
+# Loglama yapılandırması
+logging:
+  level:
+    com.d_tech.libsys: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN

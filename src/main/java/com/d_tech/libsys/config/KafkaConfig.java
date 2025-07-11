@@ -24,15 +24,14 @@ import java.util.Map;
 @EnableKafka
 public class KafkaConfig {
 
-    @Value("localhost:19081")
+    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
 
-    @Value("project-api")
+    @Value("${spring.kafka.consumer.group-id:libsys-group}")
     private String groupId;
 
     /**
      * Kafka Producer Factory Bean
-     * Mesaj göndermek için kullanılır
      */
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
@@ -42,18 +41,17 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 
         // Producer performans ayarları
-        configProps.put(ProducerConfig.ACKS_CONFIG, "all"); // Tüm replikalardan onay bekle
-        configProps.put(ProducerConfig.RETRIES_CONFIG, 3); // 3 kez deneme
-        configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384); // Batch boyutu
-        configProps.put(ProducerConfig.LINGER_MS_CONFIG, 5); // Batch bekleme süresi
-        configProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432); // Buffer memory
+        configProps.put(ProducerConfig.ACKS_CONFIG, "1"); // Tek broker için
+        configProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+        configProps.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
+        configProps.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+        configProps.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
 
         return new DefaultKafkaProducerFactory<>(configProps);
     }
 
     /**
      * Kafka Template Bean
-     * Producer'ı kullanmak için template
      */
     @Bean
     public KafkaTemplate<String, Object> kafkaTemplate() {
@@ -62,7 +60,6 @@ public class KafkaConfig {
 
     /**
      * Kafka Consumer Factory Bean
-     * Mesaj almak için kullanılır
      */
     @Bean
     public ConsumerFactory<String, Object> consumerFactory() {
@@ -73,10 +70,10 @@ public class KafkaConfig {
         configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
 
         // Consumer ayarları
-        configProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"); // En baştan oku
-        configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false); // Manuel commit
-        configProps.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 30000); // Session timeout
-        configProps.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, 10000); // Heartbeat interval
+        configProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        configProps.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, 30000);
+        configProps.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, 10000);
 
         // JSON deserializer güvenlik ayarları
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.d_tech.libsys.dto");
@@ -87,7 +84,6 @@ public class KafkaConfig {
 
     /**
      * Kafka Listener Container Factory
-     * @KafkaListener annotasyonu için gerekli
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory() {
@@ -96,8 +92,8 @@ public class KafkaConfig {
         factory.setConsumerFactory(consumerFactory());
 
         // Listener ayarları
-        factory.setConcurrency(3); // 3 paralel consumer
-        factory.getContainerProperties().setPollTimeout(3000); // Poll timeout
+        factory.setConcurrency(1); // İlk test için 1
+        factory.getContainerProperties().setPollTimeout(3000);
 
         return factory;
     }
