@@ -6,6 +6,7 @@ import com.d_tech.libsys.dto.SignupRequest;
 import com.d_tech.libsys.dto.SignupResponse;
 import com.d_tech.libsys.security.JwtUtil;
 import com.d_tech.libsys.security.UserDetailsServiceImpl;
+import com.d_tech.libsys.service.AsyncUserService;
 import com.d_tech.libsys.service.UserService;
 
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Authentication controller - kullanıcı giriş ve kayıt işlemlerini yönetir
+ * Artık hem senkron hem de asenkron kayıt desteği var
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -28,7 +30,8 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
-    private final UserService userService;
+    private final UserService userService; // Senkron servis
+    private final AsyncUserService asyncUserService; // Asenkron servis
 
     /**
      * Kullanıcı giriş endpoint'i
@@ -71,32 +74,83 @@ public class AuthController {
     }
 
     /**
-     * Kullanıcı kayıt endpoint'i
+     * Asenkron kullanıcı kayıt endpoint'i (ÖNERİLEN)
+     * Kullanıcıyı bekletmez, Kafka üzerinden işlenir
      */
-    @PostMapping("/signup")
-    public ResponseEntity<SignupResponse> signup(@RequestBody SignupRequest request) {
+    @PostMapping("/signup-async")
+    public ResponseEntity<SignupResponse> signupAsync(@RequestBody SignupRequest request) {
         try {
-            // Debug için log ekle
-            System.out.println("Signup attempt for username: " + request.getUsername());
+            System.out.println("Asenkron kayıt isteği alındı: username=" + request.getUsername());
 
-            // Kayıt işlemini gerçekleştir
-            SignupResponse response = userService.registerUser(request);
+            // Asenkron kayıt işlemini başlat
+            SignupResponse response = asyncUserService.registerUserAsync(request);
 
             // Başarı durumunu kontrol et
-            if (response.getMessage().contains("başarıyla")) {
-                System.out.println("User successfully registered: " + request.getUsername());
-                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            if (response.getMessage().contains("alındı") || response.getMessage().contains("Event ID")) {
+                System.out.println("Asenkron kayıt isteği kabul edildi: username=" + request.getUsername());
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(response); // 202 Accepted
             } else {
-                // Kayıt başarısız (validasyon hatası vs.)
-                System.out.println("Signup failed for username: " + request.getUsername() + " - " + response.getMessage());
+                // Validasyon hatası vs.
+                System.out.println("Asenkron kayıt isteği reddedildi: username=" + request.getUsername() +
+                        " - " + response.getMessage());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
 
         } catch (Exception e) {
-            System.out.println("Signup error: " + e.getMessage());
+            System.out.println("Asenkron kayıt hatası: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new SignupResponse("Kayıt isteği alınamadı. Lütfen tekrar deneyin."));
+        }
+    }
+
+    /**
+     * Senkron kullanıcı kayıt endpoint'i (GERİYE UYUMLULUK İÇİN)
+     * Eski sistemlerle uyumlu olmak için tutuldu
+     */
+    @PostMapping("/signup")
+    public ResponseEntity<SignupResponse> signup(@RequestBody SignupRequest request) {
+        try {
+            System.out.println("Senkron kayıt isteği alındı: username=" + request.getUsername());
+
+            // Senkron kayıt işlemini gerçekleştir
+            SignupResponse response = userService.registerUser(request);
+
+            // Başarı durumunu kontrol et
+            if (response.getMessage().contains("başarıyla")) {
+                System.out.println("Senkron kayıt başarılı: username=" + request.getUsername());
+                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            } else {
+                // Kayıt başarısız (validasyon hatası vs.)
+                System.out.println("Senkron kayıt başarısız: username=" + request.getUsername() +
+                        " - " + response.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+        } catch (Exception e) {
+            System.out.println("Senkron kayıt hatası: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new SignupResponse("Kayıt işlemi sırasında beklenmeyen bir hata oluştu!"));
+        }
+    }
+
+    /**
+     * Kayıt durumu sorgulama endpoint'i
+     * Asenkron kayıt sonrası kullanıcı durumunu öğrenmek için
+     */
+    @GetMapping("/registration-status/{eventId}")
+    public ResponseEntity<String> getRegistrationStatus(@PathVariable String eventId) {
+        try {
+            System.out.println("Kayıt durumu sorgulanıyor: eventId=" + eventId);
+
+            String status = asyncUserService.getRegistrationStatus(eventId);
+            return ResponseEntity.ok(status);
+
+        } catch (Exception e) {
+            System.out.println("Kayıt durumu sorgulama hatası: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Durum sorgulanamadı");
         }
     }
 
@@ -107,5 +161,13 @@ public class AuthController {
     public ResponseEntity<Boolean> checkUsername(@PathVariable String username) {
         boolean exists = userService.existsByUsername(username);
         return ResponseEntity.ok(exists);
+    }
+
+    /**
+     * Sistem durumu endpoint'i
+     */
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Auth service is running");
     }
 }

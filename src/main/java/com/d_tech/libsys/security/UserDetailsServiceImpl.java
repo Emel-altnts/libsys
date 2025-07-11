@@ -16,10 +16,6 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * UserDetailsServiceImpl sınıfı, Spring Security'nin kullanıcıyı kimlik doğrulama (authentication) sürecinde
- * veritabanından bulması için gerekli olan UserDetailsService arayüzünün implementasyonudur.
- */
 @Service
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -31,33 +27,23 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         User user = new User();
         user.setUsername(userDto.getUsername());
         user.setPassword(passwordEncoder.encode(userDto.getPassword()));
-        user.setRoles(Set.of("USER")); // varsayılan rol
+        user.setRoles(Set.of("USER"));
         userRepository.save(user);
     }
 
-    /**
-     * Belirtilen kullanıcı adına göre kullanıcıyı veritabanından getirir.
-     * Rolleri de dahil ederek UserDetails nesnesini oluşturur.
-     *
-     * @param username Sisteme giriş yapmaya çalışan kullanıcının kullanıcı adı
-     * @return Spring Security için uygun UserDetails nesnesi
-     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // Kullanıcıyı veritabanında ara
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // Kullanıcının rollerini Spring Security'nin anlayacağı yetkilere çevir
         Collection<GrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role)) // ROLE_ prefix'i ekle
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                 .collect(Collectors.toList());
 
-        // UserDetails nesnesini oluştur
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                authorities // Artık roller dahil
+                authorities
         );
     }
 }

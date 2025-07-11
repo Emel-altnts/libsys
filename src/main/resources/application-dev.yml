@@ -1,15 +1,15 @@
-
 server:
   port: 9090
 
 spring:
-
+  # PostgreSQL Database Configuration
   datasource:
     url: jdbc:postgresql://localhost:5432/postgres
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
 
+  # JPA/Hibernate Configuration
   jpa:
     hibernate:
       ddl-auto: update
@@ -17,5 +17,72 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
 
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
 
+    # Producer Configuration
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all  # Tüm replikalardan onay bekle
+      retries: 3
+      batch-size: 16384
+      linger-ms: 5
+      buffer-memory: 33554432
+      properties:
+        spring.json.add.type.headers: false  # Type header'ı ekleme
+
+    # Consumer Configuration
+    consumer:
+      group-id: libsys-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false  # Manuel commit
+      session-timeout-ms: 30000
+      heartbeat-interval-ms: 10000
+      properties:
+        spring.json.trusted.packages: "com.d_tech.libsys.dto"
+        spring.json.value.default.type: "com.d_tech.libsys.dto.UserRegistrationEvent"
+
+    # Listener Configuration
+    listener:
+      ack-mode: manual_immediate  # Manuel acknowledgment
+      concurrency: 3  # 3 paralel consumer
+      poll-timeout: 3000
+
+  # Scheduled Task Configuration
+  task:
+    scheduling:
+      pool:
+        size: 2  # Scheduled task'lar için thread pool size
+
+# Application Specific Kafka Topics
+app:
+  kafka:
+    topic:
+      user-registration: "user-registration-topic"
+
+# Logging Configuration
+logging:
+  level:
+    com.d_tech.libsys: DEBUG
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

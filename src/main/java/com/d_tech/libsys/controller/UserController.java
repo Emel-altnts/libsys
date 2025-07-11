@@ -10,8 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Bu controller, kullanıcılarla ilgili işlemleri (listeleme, profil görüntüleme vs.) yönetir.
- * Güvenlik için JWT zorunludur ve gerekirse rol bazlı erişim de sağlanabilir.
+ * Bu controller, kullanıcılarla ilgili işlemleri yönetir.
  */
 @RestController
 @RequestMapping("/api/users")
@@ -20,10 +19,6 @@ public class UserController {
 
     private final UserRepository userRepository;
 
-    /**
-     * Sistemdeki tüm kullanıcıları getirir.
-     * Bu endpoint sadece ADMIN rolündeki kullanıcılar tarafından erişilebilir.
-     */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
@@ -31,10 +26,6 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    /**
-     * Belirli bir kullanıcıyı ID’ye göre getirir.
-     * Bu işlem sadece kimliği doğrulanmış kullanıcılar için geçerlidir.
-     */
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<User> getUserById(@PathVariable Long id) {
@@ -43,9 +34,6 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * Kullanıcı silme işlemi — sadece ADMIN’ler yapabilir.
-     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
@@ -56,6 +44,4 @@ public class UserController {
         userRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }
-
-
 }

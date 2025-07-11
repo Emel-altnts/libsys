@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
             User newUser = User.builder()
                     .username(signupRequest.getUsername().trim())
                     .password(passwordEncoder.encode(signupRequest.getPassword()))
-                    .roles(Set.of("USER")) // Varsayılan rol
+                    .roles(Set.of("USER"))
                     .build();
 
             // 6. Veritabanına kaydet
@@ -57,7 +57,6 @@ public class UserServiceImpl implements UserService {
             return new SignupResponse("Kullanıcı başarıyla kaydedildi!");
 
         } catch (Exception e) {
-            // Hata durumunda log ve kullanıcıya bilgi ver
             System.out.println("Kullanıcı kayıt hatası: " + e.getMessage());
             return new SignupResponse("Kayıt işlemi sırasında bir hata oluştu!");
         }
