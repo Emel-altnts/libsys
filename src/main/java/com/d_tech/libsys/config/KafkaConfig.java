@@ -24,10 +24,10 @@ import java.util.Map;
 @EnableKafka
 public class KafkaConfig {
 
-    @Value("${kafka.bootstrap-servers:localhost:9092}")
+    @Value("localhost:19081")
     private String bootstrapServers;
 
-    @Value("${kafka.group-id:1}")
+    @Value("project-api")
     private String groupId;
 
     /**
