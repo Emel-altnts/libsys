@@ -20,9 +20,9 @@ spring:
   server:
     port: 9090  # Ana uygulama portu
 
-  # Kafka Yapılandırması (Port düzeltmesi)
+  # Kafka Yapılandırması
   kafka:
-    bootstrap-servers: localhost:9092  # Doğru port
+    bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -58,6 +58,9 @@ app:
   kafka:
     topic:
       user-registration: user-registration-topic
+      stock-control: stock-control-topic
+      stock-order: stock-order-topic
+      invoice: invoice-topic
 
 # Loglama yapılandırması
 logging:
@@ -65,3 +68,14 @@ logging:
     com.d_tech.libsys: DEBUG
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
+    org.springframework.security: DEBUG
+
+# Scheduled task yapılandırması
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
