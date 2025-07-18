@@ -23,12 +23,12 @@ import java.util.Map;
 @Configuration
 @EnableKafka
 public class KafkaConfig {
-
-    @Value("bootstrap-servers: localhost:19081")
+    @Value("${spring.kafka.bootstrap-servers}")  // ✅ Use Spring property
     private String bootstrapServers;
 
-    @Value("group-id: auth-api")
+    @Value("${spring.kafka.consumer.group-id}")  // ✅ Use Spring property
     private String groupId;
+
 
     /**
      * Kafka Producer Factory Bean

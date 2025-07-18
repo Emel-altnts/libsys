@@ -1,3 +1,6 @@
+server:
+  port: 9090  # ✅ Move to correct location
+
 spring:
   # PostgreSQL Veritabanı Yapılandırması
   datasource:
