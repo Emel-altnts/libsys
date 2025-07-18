@@ -23,10 +23,10 @@ import java.util.Map;
 @Configuration
 @EnableKafka
 public class KafkaConfig {
-    @Value("${spring.kafka.bootstrap-servers}")  // ✅ Use Spring property
+    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")  // ✅ Use Spring property
     private String bootstrapServers;
 
-    @Value("${spring.kafka.consumer.group-id}")  // ✅ Use Spring property
+    @Value("${spring.kafka.consumer.group-id:libsys-group}")  // ✅ Use Spring property
     private String groupId;
 
 

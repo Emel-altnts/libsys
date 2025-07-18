@@ -1,7 +1,5 @@
-server:
-  port: 9090  # ✅ Move to correct location
-
 spring:
+
   # PostgreSQL Veritabanı Yapılandırması
   datasource:
     url: jdbc:postgresql://localhost:5432/postgres
@@ -18,14 +16,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
   # Server Port Yapılandırması
   server:
     port: 9090  # Ana uygulama portu
 
-  # Kafka Yapılandırması
+  # Kafka Yapılandırması (Port düzeltmesi)
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: localhost:9092  # Doğru port
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -33,37 +30,19 @@ spring:
       retries: 3
       retry-backoff-ms: 1000
       request-timeout-ms: 30000
-      delivery-timeout-ms: 120000
 
-    consumer:
-      group-id: libsys-group
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      auto-offset-reset: earliest
-      enable-auto-commit: false
-      session-timeout-ms: 30000
-      heartbeat-interval-ms: 3000
-      max-poll-interval-ms: 300000
-      fetch-min-size: 1
-      fetch-max-wait: 500
-      properties:
-        spring.json.trusted.packages: "com.d_tech.libsys.dto"
-        spring.json.value.default.type: "com.d_tech.libsys.dto.UserRegistrationEvent"
-
-    listener:
-      ack-mode: manual_immediate
-      concurrency: 1
-      poll-timeout: 3000
-      missing-topics-fatal: false
+      -30,6 +49,19 @@ spring:
+        listener:
+          ack-mode: manual_immediate
+          concurrency: 1
+          poll-timeout: 3000
+          missing-topics-fatal: false
 
 # Uygulama özel yapılandırmaları
 app:
   kafka:
     topic:
       user-registration: user-registration-topic
-      stock-control: stock-control-topic
-      stock-order: stock-order-topic
-      invoice: invoice-topic
 
 # Loglama yapılandırması
 logging:
@@ -71,14 +50,3 @@ logging:
     com.d_tech.libsys: DEBUG
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
-    org.springframework.security: DEBUG
-
-# Scheduled task yapılandırması
-management:
-  endpoint:
-    health:
-      show-details: always
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
