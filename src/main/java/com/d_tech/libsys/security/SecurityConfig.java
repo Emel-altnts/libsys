@@ -43,32 +43,37 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    DaoAuthenticationProvider authProvider,
                                                    JwtFilter jwtFilter) throws Exception {
+
+        System.out.println("🔐 SecurityFilterChain yapılandırılıyor...");
+
         http
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
-                        (request, response, authException) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Yetkisiz giriş!")
+                        (request, response, authException) -> {
+                            System.out.println("❌ 401 Unauthorized: " + request.getRequestURI());
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Yetkisiz giriş!");
+                        }
                 ))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // Kimlik doğrulama endpoint'leri - herkese açık
-                        .requestMatchers("/api/auth/**").permitAll()
+                .authorizeHttpRequests(auth -> {
+                    System.out.println("🛡️ URL yetkilendirme kuralları yapılandırılıyor...");
 
-                        // Kitap endpoint'leri - okuma herkese açık
-                        .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
+                    auth
+                            // Herkese açık endpoint'ler
+                            .requestMatchers("/api/auth/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()  // ⭐ ÖNEMLİ
+                            .requestMatchers("/message").permitAll()
 
-                        // Stok endpoint'leri - okuma herkese açık (test için)
-                        .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()
+                            // Diğer tüm istekler authentication gerektirir
+                            .anyRequest().authenticated();
 
-                        // Ana sayfa - herkese açık
-                        .requestMatchers("/message").permitAll()
-
-                        // Diğer tüm istekler kimlik doğrulama gerektiriyor
-                        .anyRequest().authenticated()
-                )
+                    System.out.println("✅ GET /api/stock/** herkese açık olarak ayarlandı");
+                })
                 .authenticationProvider(authProvider)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
+        System.out.println("🎯 SecurityFilterChain yapılandırması tamamlandı!");
         return http.build();
     }
 }

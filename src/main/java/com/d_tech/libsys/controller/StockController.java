@@ -148,16 +148,40 @@ public class StockController {
     }
 
     /**
-     * Kitap stok bilgisini getir
+     * Kitap stok bilgisini getir - DEBUG VERSION
      */
     @GetMapping("/{bookId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public ResponseEntity<BookStock> getBookStock(@PathVariable Long bookId) {
-        log.info("Stok bilgisi istendi: bookId={}", bookId);
+        System.out.println("🔍 Stok bilgisi istendi: bookId=" + bookId);
 
-        Optional<BookStock> stock = stockService.getBookStock(bookId);
-        return stock.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            Optional<BookStock> stock = stockService.getBookStock(bookId);
+
+            if (stock.isPresent()) {
+                BookStock bookStock = stock.get();
+                System.out.println("✅ Stok bilgisi bulundu: bookId=" + bookId +
+                        ", quantity=" + bookStock.getCurrentQuantity() +
+                        ", price=" + bookStock.getUnitPrice());
+                return ResponseEntity.ok(bookStock);
+            } else {
+                System.out.println("❌ Stok bilgisi bulunamadı: bookId=" + bookId);
+
+                // Veritabanında bu bookId için kayıt var mı kontrol et
+                boolean bookExists = bookRepository.existsById(bookId);
+                System.out.println("📚 Kitap var mı: " + bookExists);
+
+                if (!bookExists) {
+                    System.out.println("⚠️  Kitap ID'si mevcut değil: " + bookId);
+                }
+
+                return ResponseEntity.notFound().build();
+            }
+
+        } catch (Exception e) {
+            System.out.println("💥 Stok bilgisi getirilirken hata: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
