@@ -51,9 +51,19 @@ public class SecurityConfig {
                 ))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Kimlik doğrulama endpoint'leri - herkese açık
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        // Kitap endpoint'leri - okuma herkese açık
                         .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
+
+                        // Stok endpoint'leri - okuma herkese açık (test için)
+                        .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()
+
+                        // Ana sayfa - herkese açık
                         .requestMatchers("/message").permitAll()
+
+                        // Diğer tüm istekler kimlik doğrulama gerektiriyor
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authProvider)

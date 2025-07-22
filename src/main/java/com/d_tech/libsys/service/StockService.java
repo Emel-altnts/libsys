@@ -33,7 +33,10 @@ public class StockService {
      * Kitap için stok kaydı oluşturur
      */
     @Transactional
-    public BookStock createBookStock(Long bookId, Integer initialQuantity, BigDecimal unitPrice, String supplierName) {
+    public BookStock createBookStock(Long bookId, Integer initialQuantity,
+                                     BigDecimal unitPrice, String supplierName,
+                                     String supplierContact) {
+
         log.info("Kitap için stok kaydı oluşturuluyor: bookId={}, quantity={}, supplier={}",
                 bookId, initialQuantity, supplierName);
 
@@ -52,6 +55,7 @@ public class StockService {
                 .currentQuantity(initialQuantity)
                 .unitPrice(unitPrice)
                 .supplierName(supplierName)
+                .supplierContact(supplierContact) // ✅ Eksik olan field
                 .build();
 
         BookStock savedStock = bookStockRepository.save(bookStock);

@@ -38,11 +38,21 @@ public class StockController {
                 request.getBookId(), request.getInitialQuantity());
 
         try {
+            // ❌ Eski kod:
+            // BookStock stock = stockService.createBookStock(
+            //     request.getBookId(),
+            //     request.getInitialQuantity(),
+            //     request.getUnitPrice(),
+            //     request.getSupplierName()
+            // );
+
+            // ✅ Yeni kod (supplierContact ile):
             BookStock stock = stockService.createBookStock(
                     request.getBookId(),
                     request.getInitialQuantity(),
                     request.getUnitPrice(),
-                    request.getSupplierName()
+                    request.getSupplierName(),
+                    request.getSupplierContact()
             );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(stock);
@@ -52,12 +62,11 @@ public class StockController {
             return ResponseEntity.badRequest().build();
         }
     }
-
     /**
      * Asenkron stok kontrolü
      */
     @PostMapping("/check/{bookId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public ResponseEntity<AsyncResponse> checkStockAsync(
             @PathVariable Long bookId,
             Authentication authentication) {
@@ -142,7 +151,7 @@ public class StockController {
      * Kitap stok bilgisini getir
      */
     @GetMapping("/{bookId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public ResponseEntity<BookStock> getBookStock(@PathVariable Long bookId) {
         log.info("Stok bilgisi istendi: bookId={}", bookId);
 
