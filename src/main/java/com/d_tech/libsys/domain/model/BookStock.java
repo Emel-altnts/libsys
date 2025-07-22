@@ -1,5 +1,6 @@
 package com.d_tech.libsys.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Table(name = "book_stocks")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // ✅ Hibernate proxy serialization hatası için
 public class BookStock {
 
     @Id
@@ -23,6 +25,7 @@ public class BookStock {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // ✅ Book proxy için de ekle
     private Book book;
 
     @Column(name = "current_quantity", nullable = false)

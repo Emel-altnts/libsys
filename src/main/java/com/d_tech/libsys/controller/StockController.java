@@ -1,6 +1,7 @@
 package com.d_tech.libsys.controller;
 
 import com.d_tech.libsys.domain.model.BookStock;
+import com.d_tech.libsys.repository.BookRepository; // ✅ Import ekledik
 import com.d_tech.libsys.service.StockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 public class StockController {
 
     private final StockService stockService;
+    private final BookRepository bookRepository; // ✅ Field ekledik
 
     /**
      * Kitap için stok kaydı oluştur
@@ -38,15 +40,6 @@ public class StockController {
                 request.getBookId(), request.getInitialQuantity());
 
         try {
-            // ❌ Eski kod:
-            // BookStock stock = stockService.createBookStock(
-            //     request.getBookId(),
-            //     request.getInitialQuantity(),
-            //     request.getUnitPrice(),
-            //     request.getSupplierName()
-            // );
-
-            // ✅ Yeni kod (supplierContact ile):
             BookStock stock = stockService.createBookStock(
                     request.getBookId(),
                     request.getInitialQuantity(),
@@ -62,6 +55,7 @@ public class StockController {
             return ResponseEntity.badRequest().build();
         }
     }
+
     /**
      * Asenkron stok kontrolü
      */
@@ -148,7 +142,7 @@ public class StockController {
     }
 
     /**
-     * Kitap stok bilgisini getir - DEBUG VERSION
+     * Kitap stok bilgisini getir - AÇIK ERİŞİM (Authentication gerekmez)
      */
     @GetMapping("/{bookId}")
     public ResponseEntity<BookStock> getBookStock(@PathVariable Long bookId) {
@@ -172,9 +166,11 @@ public class StockController {
 
                 if (!bookExists) {
                     System.out.println("⚠️  Kitap ID'si mevcut değil: " + bookId);
+                    return ResponseEntity.notFound().build();
+                } else {
+                    System.out.println("⚠️  Kitap mevcut ama stok kaydı yok: " + bookId);
+                    return ResponseEntity.notFound().build();
                 }
-
-                return ResponseEntity.notFound().build();
             }
 
         } catch (Exception e) {
