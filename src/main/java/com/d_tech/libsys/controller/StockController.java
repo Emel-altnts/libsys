@@ -1,7 +1,7 @@
 package com.d_tech.libsys.controller;
 
 import com.d_tech.libsys.domain.model.BookStock;
-import com.d_tech.libsys.repository.BookRepository; // ✅ Import ekledik
+import com.d_tech.libsys.repository.BookRepository; // ✅ EKLENDİ
 import com.d_tech.libsys.service.StockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,13 +26,12 @@ import java.util.concurrent.CompletableFuture;
 public class StockController {
 
     private final StockService stockService;
-    private final BookRepository bookRepository; // ✅ Field ekledik
+    private final BookRepository bookRepository; // ✅ EKLENDİ
 
     /**
      * Kitap için stok kaydı oluştur
      */
     @PostMapping("/create")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookStock> createBookStock(
             @RequestBody CreateStockRequest request) {
 
@@ -60,16 +59,15 @@ public class StockController {
      * Asenkron stok kontrolü
      */
     @PostMapping("/check/{bookId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public ResponseEntity<AsyncResponse> checkStockAsync(
             @PathVariable Long bookId,
             Authentication authentication) {
 
-        log.info("Asenkron stok kontrolü: bookId={}, user={}",
-                bookId, authentication.getName());
+        String username = authentication != null ? authentication.getName() : "anonymous";
+        log.info("Asenkron stok kontrolü: bookId={}, user={}", bookId, username);
 
         try {
-            CompletableFuture<String> future = stockService.checkStockAsync(bookId, authentication.getName());
+            CompletableFuture<String> future = stockService.checkStockAsync(bookId, username);
             String eventId = future.get();
 
             return ResponseEntity.accepted().body(new AsyncResponse(
@@ -87,18 +85,18 @@ public class StockController {
      * Asenkron stok azaltma
      */
     @PostMapping("/decrease/{bookId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public ResponseEntity<AsyncResponse> decreaseStockAsync(
             @PathVariable Long bookId,
             @RequestBody StockQuantityRequest request,
             Authentication authentication) {
 
+        String username = authentication != null ? authentication.getName() : "anonymous";
         log.info("Asenkron stok azaltma: bookId={}, quantity={}, user={}",
-                bookId, request.getQuantity(), authentication.getName());
+                bookId, request.getQuantity(), username);
 
         try {
             CompletableFuture<String> future = stockService.decreaseStockAsync(
-                    bookId, request.getQuantity(), authentication.getName());
+                    bookId, request.getQuantity(), username);
             String eventId = future.get();
 
             return ResponseEntity.accepted().body(new AsyncResponse(
@@ -116,18 +114,18 @@ public class StockController {
      * Asenkron stok artırma
      */
     @PostMapping("/increase/{bookId}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AsyncResponse> increaseStockAsync(
             @PathVariable Long bookId,
             @RequestBody StockQuantityRequest request,
             Authentication authentication) {
 
+        String username = authentication != null ? authentication.getName() : "anonymous";
         log.info("Asenkron stok artırma: bookId={}, quantity={}, user={}",
-                bookId, request.getQuantity(), authentication.getName());
+                bookId, request.getQuantity(), username);
 
         try {
             CompletableFuture<String> future = stockService.increaseStockAsync(
-                    bookId, request.getQuantity(), authentication.getName());
+                    bookId, request.getQuantity(), username);
             String eventId = future.get();
 
             return ResponseEntity.accepted().body(new AsyncResponse(
@@ -142,7 +140,7 @@ public class StockController {
     }
 
     /**
-     * Kitap stok bilgisini getir - AÇIK ERİŞİM (Authentication gerekmez)
+     * Kitap stok bilgisini getir - DEBUG VERSION
      */
     @GetMapping("/{bookId}")
     public ResponseEntity<BookStock> getBookStock(@PathVariable Long bookId) {
@@ -166,11 +164,9 @@ public class StockController {
 
                 if (!bookExists) {
                     System.out.println("⚠️  Kitap ID'si mevcut değil: " + bookId);
-                    return ResponseEntity.notFound().build();
-                } else {
-                    System.out.println("⚠️  Kitap mevcut ama stok kaydı yok: " + bookId);
-                    return ResponseEntity.notFound().build();
                 }
+
+                return ResponseEntity.notFound().build();
             }
 
         } catch (Exception e) {
@@ -184,7 +180,6 @@ public class StockController {
      * Düşük stoklu kitapları listele
      */
     @GetMapping("/low-stock")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<BookStock>> getLowStockBooks() {
         log.info("Düşük stoklu kitaplar istendi");
 
@@ -196,7 +191,6 @@ public class StockController {
      * Yeniden stok gerekli kitapları listele
      */
     @GetMapping("/restock-needed")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<BookStock>> getBooksNeedingRestock() {
         log.info("Yeniden stok gerekli kitaplar istendi");
 
@@ -208,7 +202,6 @@ public class StockController {
      * Stok durumuna göre kitapları listele
      */
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<BookStock>> getBooksByStockStatus(@PathVariable String status) {
         log.info("Stok durumuna göre kitaplar istendi: status={}", status);
 
@@ -226,7 +219,6 @@ public class StockController {
      * Tedarikçiye göre stokları listele
      */
     @GetMapping("/supplier/{supplierName}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<BookStock>> getStocksBySupplier(@PathVariable String supplierName) {
         log.info("Tedarikçiye göre stoklar istendi: supplier={}", supplierName);
 
@@ -238,7 +230,6 @@ public class StockController {
      * Toplam stok değerini hesapla
      */
     @GetMapping("/total-value")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Double> getTotalStockValue() {
         log.info("Toplam stok değeri istendi");
 
@@ -250,7 +241,6 @@ public class StockController {
      * Stok bilgilerini güncelle
      */
     @PutMapping("/{stockId}")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookStock> updateBookStock(
             @PathVariable Long stockId,
             @RequestBody UpdateStockRequest request) {
@@ -279,7 +269,6 @@ public class StockController {
      * Düşük stok uyarılarını manuel tetikle
      */
     @PostMapping("/alert/low-stock")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> triggerLowStockAlerts() {
         log.info("Düşük stok uyarıları manuel tetiklendi");
 

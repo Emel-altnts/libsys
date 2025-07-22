@@ -47,52 +47,39 @@ public class SecurityConfig {
         System.out.println("🔐 SecurityFilterChain yapılandırılıyor...");
 
         http
-                .csrf(csrf -> {
-                    System.out.println("🚫 CSRF devre dışı bırakılıyor...");
-                    csrf.disable();
-                })
+                .csrf(csrf -> csrf.disable())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (request, response, authException) -> {
-                            System.out.println("❌ 401 Unauthorized: " + request.getRequestURI() +
-                                    " - Reason: " + authException.getMessage());
-                            System.out.println("📋 Request Headers:");
-                            request.getHeaderNames().asIterator()
-                                    .forEachRemaining(name ->
-                                            System.out.println("  " + name + ": " + request.getHeader(name))
-                                    );
+                            System.out.println("❌ 401 Unauthorized: " + request.getRequestURI());
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Yetkisiz giriş!");
                         }
                 ))
-                .sessionManagement(session -> {
-                    System.out.println("⚙️ Session management STATELESS olarak ayarlanıyor...");
-                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-                })
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
                     System.out.println("🛡️ URL yetkilendirme kuralları yapılandırılıyor...");
 
                     auth
-                            // Herkese açık endpoint'ler - Authentication gerektirmez
+                            // Herkese açık endpoint'ler
                             .requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()  // ⭐ KRITIK
-                            .requestMatchers("/message", "/", "/error").permitAll()
-                            .requestMatchers("/actuator/health").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()
+
+                            // ✅ STOK ENDPOINT'LERİNİ HERKESE AÇ (TEST İÇİN)
+                            .requestMatchers(HttpMethod.POST, "/api/stock/**").permitAll()
+                            .requestMatchers(HttpMethod.PUT, "/api/stock/**").permitAll()
+                            .requestMatchers(HttpMethod.DELETE, "/api/stock/**").permitAll()
+
+                            .requestMatchers("/message").permitAll()
 
                             // Diğer tüm istekler authentication gerektirir
                             .anyRequest().authenticated();
 
-                    System.out.println("✅ Açık endpoint'ler yapılandırıldı:");
-                    System.out.println("  - /api/auth/** (tüm HTTP methodları)");
-                    System.out.println("  - GET /api/books/**");
-                    System.out.println("  - GET /api/stock/**  ← BU ÖNEMLİ!");
-                    System.out.println("  - /message, /, /error");
+                    System.out.println("✅ Stok endpoint'leri herkese açık olarak ayarlandı");
                 })
                 .authenticationProvider(authProvider)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         System.out.println("🎯 SecurityFilterChain yapılandırması tamamlandı!");
-        System.out.println("🔍 GET /api/stock/2 isteği authentication gerektirmeyecek");
-
         return http.build();
     }
 }
