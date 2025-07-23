@@ -17,7 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableMethodSecurity(prePostEnabled = true) // ✅ Method security aktif
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Bean
@@ -44,17 +44,26 @@ public class SecurityConfig {
                                                    DaoAuthenticationProvider authProvider,
                                                    JwtFilter jwtFilter) throws Exception {
 
-        System.out.println("🔐 SecurityFilterChain with Authentication yapılandırılıyor...");
+        System.out.println("🔐 SecurityFilterChain yapılandırılıyor...");
 
         http
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (request, response, authException) -> {
-                            System.out.println("❌ 401 Unauthorized: " + request.getRequestURI() +
-                                    " - " + authException.getMessage());
+                            System.out.println("🚨 AUTHENTICATION ENTRY POINT TRIGGERED!");
+                            System.out.println("❌ 401 Unauthorized: " + request.getMethod() + " " + request.getRequestURI());
+                            System.out.println("🔍 Auth Header: " + request.getHeader("Authorization"));
+                            System.out.println("💥 Exception: " + authException.getMessage());
+
                             response.setContentType("application/json");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"JWT token gerekli\"}");
+                            response.getWriter().write("{\n" +
+                                    "  \"error\": \"Unauthorized\",\n" +
+                                    "  \"message\": \"" + authException.getMessage() + "\",\n" +
+                                    "  \"path\": \"" + request.getRequestURI() + "\",\n" +
+                                    "  \"method\": \"" + request.getMethod() + "\",\n" +
+                                    "  \"timestamp\": \"" + java.time.Instant.now() + "\"\n" +
+                                    "}");
                         }
                 ))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -62,25 +71,26 @@ public class SecurityConfig {
                     System.out.println("🛡️ URL yetkilendirme kuralları yapılandırılıyor...");
 
                     auth
-                            // Herkese açık endpoint'ler
+                            // ✅ Herkese açık endpoint'ler - NO AUTH REQUIRED
                             .requestMatchers("/api/auth/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
                             .requestMatchers("/message").permitAll()
+                            .requestMatchers("/error").permitAll()
 
-                            // Sadece READ işlemleri için GET endpoint'leri serbest
-                            .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/stock/orders/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/invoices/**").permitAll()
+                            // 🔓 TEMPORARY: Test için tüm endpoint'leri authenticated yap (ADMIN role check yok)
+                            .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
+                            .requestMatchers(HttpMethod.POST, "/api/**").authenticated()
+                            .requestMatchers(HttpMethod.PUT, "/api/**").authenticated()
+                            .requestMatchers(HttpMethod.DELETE, "/api/**").authenticated()
 
-                            // Diğer tüm istekler authentication gerektirir
+                            // ✅ Diğer tüm istekler authentication gerektirir
                             .anyRequest().authenticated();
 
-                    System.out.println("✅ Authentication gerekli endpoint'ler ayarlandı");
+                    System.out.println("✅ URL yetkilendirme kuralları tamamlandı - TÜM API ENDPOINT'LER AUTHENTICATED");
                 })
                 .authenticationProvider(authProvider)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
-        System.out.println("🎯 SecurityFilterChain with Authentication tamamlandı!");
+        System.out.println("🎯 SecurityFilterChain tamamlandı!");
         return http.build();
     }
 }

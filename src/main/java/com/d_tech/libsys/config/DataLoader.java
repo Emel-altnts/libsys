@@ -11,7 +11,6 @@ import java.util.Set;
 
 /**
  * Uygulama başlatıldığında test kullanıcılarını otomatik olarak oluşturan sınıf.
- * Bu sınıf sadece geliştirme ortamında kullanılmalı, production'da kaldırılmalı.
  */
 @Component
 @RequiredArgsConstructor
@@ -22,7 +21,9 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // Eğer testuser yoksa oluştur
+        System.out.println("🔄 DataLoader çalışıyor - Kullanıcılar kontrol ediliyor...");
+
+        // Test kullanıcısı oluştur
         if (!userRepository.existsByUsername("testuser")) {
             User testUser = User.builder()
                     .username("testuser")
@@ -30,10 +31,12 @@ public class DataLoader implements CommandLineRunner {
                     .roles(Set.of("USER"))
                     .build();
             userRepository.save(testUser);
-            System.out.println("Test kullanıcısı oluşturuldu: testuser/test1234");
+            System.out.println("✅ Test kullanıcısı oluşturuldu: testuser/test1234 (Roles: USER)");
+        } else {
+            System.out.println("ℹ️ Test kullanıcısı zaten mevcut: testuser");
         }
 
-        // Admin kullanıcısı da oluştur
+        // Admin kullanıcısı oluştur
         if (!userRepository.existsByUsername("admin")) {
             User adminUser = User.builder()
                     .username("admin")
@@ -41,7 +44,20 @@ public class DataLoader implements CommandLineRunner {
                     .roles(Set.of("ADMIN", "USER"))
                     .build();
             userRepository.save(adminUser);
-            System.out.println("Admin kullanıcısı oluşturuldu: admin/admin123");
+            System.out.println("✅ Admin kullanıcısı oluşturuldu: admin/admin123 (Roles: ADMIN, USER)");
+        } else {
+            System.out.println("ℹ️ Admin kullanıcısı zaten mevcut: admin");
         }
+
+        // Kullanıcı sayısını kontrol et
+        long userCount = userRepository.count();
+        System.out.println("📊 Toplam kullanıcı sayısı: " + userCount);
+
+        // Test için admin kullanıcısının rollerini kontrol et
+        userRepository.findByUsername("admin").ifPresent(admin -> {
+            System.out.println("🔑 Admin kullanıcısı rolleri: " + admin.getRoles());
+        });
+
+        System.out.println("✅ DataLoader tamamlandı");
     }
 }
