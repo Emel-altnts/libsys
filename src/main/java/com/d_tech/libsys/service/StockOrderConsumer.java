@@ -5,7 +5,6 @@ import com.d_tech.libsys.dto.StockOrderEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -13,7 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Stok sipariş event'lerini işleyen Kafka Consumer
+ * FIXED: Stok sipariş event'lerini işleyen Kafka Consumer
+ * Acknowledgment sorunu çözüldü
  */
 @Service
 @RequiredArgsConstructor
@@ -25,7 +25,7 @@ public class StockOrderConsumer {
     private final KafkaProducerService kafkaProducerService;
 
     /**
-     * Stok sipariş event'lerini işler
+     * 🚀 FIXED: Acknowledgment parametresi kaldırıldı - AUTO_COMMIT kullanılıyor
      */
     @KafkaListener(
             topics = "${app.kafka.topic.stock-order:stock-order-topic}",
@@ -36,10 +36,9 @@ public class StockOrderConsumer {
     public void handleStockOrderEvent(
             @Payload StockOrderEvent event,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
-            @Header(KafkaHeaders.OFFSET) long offset,
-            Acknowledgment acknowledgment) {
+            @Header(KafkaHeaders.OFFSET) long offset) {
 
-        log.info("Stok sipariş event'i alındı: eventId={}, type={}, orderId={}, partition={}, offset={}",
+        log.info("✅ Stok sipariş event'i alındı: eventId={}, type={}, orderId={}, partition={}, offset={}",
                 event.getEventId(), event.getEventType(), event.getOrderId(), partition, offset);
 
         try {
@@ -52,31 +51,33 @@ public class StockOrderConsumer {
                 case RECEIVE_ORDER -> handleReceiveOrder(event);
                 case GENERATE_INVOICE -> handleGenerateInvoice(event);
                 default -> {
-                    log.warn("Bilinmeyen sipariş event tipi: {}", event.getEventType());
+                    log.warn("⚠️ Bilinmeyen sipariş event tipi: {}", event.getEventType());
                     event.setStatus(StockOrderEvent.EventStatus.FAILED);
                     event.setMessage("Bilinmeyen event tipi");
                 }
             }
 
+            // ✅ Auto-commit ile başarı durumu
             if (event.getStatus() == StockOrderEvent.EventStatus.COMPLETED) {
-                acknowledgment.acknowledge();
-                log.info("Stok sipariş event'i başarıyla işlendi: eventId={}", event.getEventId());
+                log.info("✅ Stok sipariş event'i başarıyla işlendi: eventId={}", event.getEventId());
             } else {
-                handleStockOrderError(event, new RuntimeException(event.getMessage()), acknowledgment);
+                log.error("❌ Stok sipariş event'i başarısız: eventId={}, message={}",
+                        event.getEventId(), event.getMessage());
+                handleStockOrderError(event, new RuntimeException(event.getMessage()));
             }
 
         } catch (Exception e) {
-            log.error("Stok sipariş event'i işlenirken hata: eventId={}, error={}",
+            log.error("💥 Stok sipariş event'i işlenirken hata: eventId={}, error={}",
                     event.getEventId(), e.getMessage(), e);
-            handleStockOrderError(event, e, acknowledgment);
+            handleStockOrderError(event, e);
         }
     }
 
     /**
-     * Sipariş oluşturma işlemi
+     * ✅ Sipariş oluşturma işlemi
      */
     private void handleCreateOrder(StockOrderEvent event) {
-        log.info("Sipariş oluşturuluyor: eventId={}", event.getEventId());
+        log.info("📦 Sipariş oluşturuluyor: eventId={}", event.getEventId());
 
         try {
             StockOrder order = stockOrderService.createOrder(event.getOrderRequest());
@@ -84,73 +85,81 @@ public class StockOrderConsumer {
             event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
             event.setMessage("Sipariş başarıyla oluşturuldu: " + order.getOrderNumber());
 
+            log.info("✅ Sipariş oluşturuldu: orderId={}, orderNumber={}, supplier={}",
+                    order.getId(), order.getOrderNumber(), order.getSupplierName());
+
         } catch (Exception e) {
+            log.error("❌ Sipariş oluşturma hatası: {}", e.getMessage(), e);
             event.setStatus(StockOrderEvent.EventStatus.FAILED);
             event.setMessage("Sipariş oluşturma hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Sipariş onaylama işlemi
+     * ✅ Sipariş onaylama işlemi
      */
     private void handleConfirmOrder(StockOrderEvent event) {
-        log.info("Sipariş onaylanıyor: orderId={}", event.getOrderId());
+        log.info("✅ Sipariş onaylanıyor: orderId={}", event.getOrderId());
 
         try {
             StockOrder order = stockOrderService.confirmOrder(event.getOrderId());
             event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
             event.setMessage("Sipariş onaylandı: " + order.getOrderNumber());
 
+            log.info("✅ Sipariş onaylandı: orderId={}, status={}", event.getOrderId(), order.getStatus());
+
         } catch (Exception e) {
+            log.error("❌ Sipariş onaylama hatası: {}", e.getMessage(), e);
             event.setStatus(StockOrderEvent.EventStatus.FAILED);
             event.setMessage("Sipariş onaylama hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Sipariş iptal etme işlemi
+     * ✅ Sipariş iptal etme işlemi
      */
     private void handleCancelOrder(StockOrderEvent event) {
-        log.info("Sipariş iptal ediliyor: orderId={}", event.getOrderId());
+        log.info("🚫 Sipariş iptal ediliyor: orderId={}", event.getOrderId());
 
         try {
             StockOrder order = stockOrderService.cancelOrder(event.getOrderId(), "Kafka event ile iptal");
             event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
             event.setMessage("Sipariş iptal edildi: " + order.getOrderNumber());
 
+            log.info("✅ Sipariş iptal edildi: orderId={}, status={}", event.getOrderId(), order.getStatus());
+
         } catch (Exception e) {
+            log.error("❌ Sipariş iptal hatası: {}", e.getMessage(), e);
             event.setStatus(StockOrderEvent.EventStatus.FAILED);
             event.setMessage("Sipariş iptal hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Sipariş teslimat alma işlemi
+     * ✅ Sipariş teslimat alma işlemi
      */
     private void handleReceiveOrder(StockOrderEvent event) {
-        log.info("Sipariş teslimatı alınıyor: orderId={}", event.getOrderId());
+        log.info("📦 Sipariş teslimatı alınıyor: orderId={}", event.getOrderId());
 
         try {
-            // Bu örnek implementasyonda tüm kalemleri tam teslimat olarak kabul ediyoruz
-            // Gerçek uygulamada event içinden teslimat detayları alınmalı
-
-            // Burada teslimat detayları parse edilmeli
-            // StockOrder order = stockOrderService.receiveOrder(event.getOrderId(), receiptItems);
-
+            // Basit implementasyon - tüm kalemleri tam teslimat kabul et
             event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
             event.setMessage("Sipariş teslimatı alındı");
 
+            log.info("✅ Sipariş teslimatı kabul edildi: orderId={}", event.getOrderId());
+
         } catch (Exception e) {
+            log.error("❌ Teslimat alma hatası: {}", e.getMessage(), e);
             event.setStatus(StockOrderEvent.EventStatus.FAILED);
             event.setMessage("Teslimat alma hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Fatura oluşturma işlemi
+     * ✅ Fatura oluşturma işlemi
      */
     private void handleGenerateInvoice(StockOrderEvent event) {
-        log.info("Fatura oluşturuluyor: orderId={}", event.getOrderId());
+        log.info("🧾 Fatura oluşturuluyor: orderId={}", event.getOrderId());
 
         try {
             // Default invoice request oluştur
@@ -163,32 +172,67 @@ public class StockOrderConsumer {
             event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
             event.setMessage("Fatura oluşturuldu: " + invoice.getInvoiceNumber());
 
+            log.info("✅ Fatura oluşturuldu: invoiceId={}, invoiceNumber={}",
+                    invoice.getId(), invoice.getInvoiceNumber());
+
         } catch (Exception e) {
+            log.error("❌ Fatura oluşturma hatası: {}", e.getMessage(), e);
             event.setStatus(StockOrderEvent.EventStatus.FAILED);
             event.setMessage("Fatura oluşturma hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Sipariş hatası işleme
+     * ✅ FIXED: Acknowledgment parametresi kaldırıldı
      */
-    private void handleStockOrderError(StockOrderEvent event, Exception error, Acknowledgment acknowledgment) {
+    private void handleStockOrderError(StockOrderEvent event, Exception error) {
         event.incrementRetry();
         event.setMessage("Hata: " + error.getMessage());
 
         if (event.canRetry()) {
-            log.warn("Stok sipariş event'i retry edilecek: eventId={}, retryCount={}",
+            log.warn("🔄 Stok sipariş event'i retry edilecek: eventId={}, retryCount={}",
                     event.getEventId(), event.getRetryCount());
 
             kafkaProducerService.sendStockOrderEventRetry(event);
-            acknowledgment.acknowledge();
         } else {
-            log.error("Stok sipariş event'i maximum retry'a ulaştı: eventId={}",
+            log.error("💀 Stok sipariş event'i maximum retry'a ulaştı: eventId={}",
                     event.getEventId());
 
             kafkaProducerService.sendStockOrderEventToDLQ(event, error.getMessage());
-            acknowledgment.acknowledge();
+        }
+    }
+
+    /**
+     * ✅ FIXED: Retry consumer - Acknowledgment kaldırıldı
+     */
+    @KafkaListener(
+            topics = "${app.kafka.topic.stock-order:stock-order-topic}.retry",
+            groupId = "${spring.kafka.consumer.group-id:libsys-group}.retry",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    @Transactional
+    public void handleStockOrderRetry(
+            @Payload StockOrderEvent event,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset) {
+
+        log.info("🔄 Stok sipariş retry event'i alındı: eventId={}, retryCount={}, partition={}, offset={}",
+                event.getEventId(), event.getRetryCount(), partition, offset);
+
+        try {
+            // Exponential backoff
+            long waitTime = (long) Math.pow(2, event.getRetryCount()) * 1000;
+            Thread.sleep(Math.min(waitTime, 30000));
+
+            // Ana işlemi tekrar çalıştır
+            handleStockOrderEvent(event, partition, offset);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("🛑 Retry işlemi kesildi: eventId={}", event.getEventId());
+        } catch (Exception e) {
+            log.error("💥 Retry işleminde hata: eventId={}, error={}", event.getEventId(), e.getMessage(), e);
+            handleStockOrderError(event, e);
         }
     }
 }
-

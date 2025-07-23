@@ -3657,3 +3657,179 @@ Caused by: java.lang.IllegalStateException: No Acknowledgment available as an ar
     15300 nanoseconds spent executing 5 pre-partial-flushes;
     20100 nanoseconds spent executing 7 partial-flushes (flushing a total of 0 entities and 0 collections)
 }
+2025-07-23 14:01:23 [scheduling-1] DEBUG c.d.l.service.ScheduledTasksService - Sistem durumu kontrolü yapılıyor...
+2025-07-23 14:01:23 [scheduling-1] INFO  c.d.l.service.EventTrackingService - Event istatistikleri hesaplanıyor...
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.orm.jpa.JpaTransactionManager - Creating new transaction with name [org.springframework.data.jpa.repository.support.SimpleJpaRepository.count]: PROPAGATION_REQUIRED,ISOLATION_DEFAULT,readOnly
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.orm.jpa.JpaTransactionManager - Opened new EntityManager [SessionImpl(404741325<open>)] for JPA transaction
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.orm.jpa.JpaTransactionManager - Exposing JPA transaction as JDBC [org.springframework.orm.jpa.vendor.HibernateJpaDialect$HibernateConnectionHandle@4d6340d1]
+2025-07-23 14:01:23 [scheduling-1] DEBUG org.hibernate.SQL - 
+    /* select
+        count(*) 
+    from
+        RegistrationEvent x */ select
+            count(*) 
+        from
+            registration_events re1_0
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.orm.jpa.JpaTransactionManager - Initiating transaction commit
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.orm.jpa.JpaTransactionManager - Committing JPA transaction on EntityManager [SessionImpl(404741325<open>)]
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.orm.jpa.JpaTransactionManager - Closing JPA EntityManager [SessionImpl(404741325<open>)] after transaction
+2025-07-23 14:01:23 [scheduling-1] INFO  o.h.e.i.StatisticalLoggingSessionEventListener - Session Metrics {
+    1807000 nanoseconds spent acquiring 1 JDBC connections;
+    0 nanoseconds spent releasing 0 JDBC connections;
+    95200 nanoseconds spent preparing 1 JDBC statements;
+    825100 nanoseconds spent executing 1 JDBC statements;
+    0 nanoseconds spent executing 0 JDBC batches;
+    0 nanoseconds spent performing 0 L2C puts;
+    0 nanoseconds spent performing 0 L2C hits;
+    0 nanoseconds spent performing 0 L2C misses;
+    0 nanoseconds spent executing 0 flushes (flushing a total of 0 entities and 0 collections);
+    6000 nanoseconds spent executing 1 pre-partial-flushes;
+    1300 nanoseconds spent executing 1 partial-flushes (flushing a total of 0 entities and 0 collections)
+}
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.o.j.SharedEntityManagerCreator$SharedEntityManagerInvocationHandler - Creating new EntityManager for shared EntityManager invocation
+2025-07-23 14:01:23 [scheduling-1] DEBUG org.hibernate.SQL - 
+    /* <criteria> */ select
+        re1_0.id,
+        re1_0.completed_at,
+        re1_0.created_at,
+        re1_0.event_id,
+        re1_0.message,
+        re1_0.retry_count,
+        re1_0.status,
+        re1_0.updated_at,
+        re1_0.username 
+    from
+        registration_events re1_0 
+    where
+        re1_0.status=?
+2025-07-23 14:01:23 [scheduling-1] INFO  o.h.e.i.StatisticalLoggingSessionEventListener - Session Metrics {
+    79000 nanoseconds spent acquiring 1 JDBC connections;
+    0 nanoseconds spent releasing 0 JDBC connections;
+    117100 nanoseconds spent preparing 1 JDBC statements;
+    635900 nanoseconds spent executing 1 JDBC statements;
+    0 nanoseconds spent executing 0 JDBC batches;
+    0 nanoseconds spent performing 0 L2C puts;
+    0 nanoseconds spent performing 0 L2C hits;
+    0 nanoseconds spent performing 0 L2C misses;
+    0 nanoseconds spent executing 0 flushes (flushing a total of 0 entities and 0 collections);
+    0 nanoseconds spent executing 0 pre-partial-flushes;
+    0 nanoseconds spent executing 0 partial-flushes (flushing a total of 0 entities and 0 collections)
+}
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.o.j.SharedEntityManagerCreator$SharedEntityManagerInvocationHandler - Creating new EntityManager for shared EntityManager invocation
+2025-07-23 14:01:23 [scheduling-1] DEBUG org.hibernate.SQL - 
+    /* <criteria> */ select
+        re1_0.id,
+        re1_0.completed_at,
+        re1_0.created_at,
+        re1_0.event_id,
+        re1_0.message,
+        re1_0.retry_count,
+        re1_0.status,
+        re1_0.updated_at,
+        re1_0.username 
+    from
+        registration_events re1_0 
+    where
+        re1_0.status=?
+2025-07-23 14:01:23 [scheduling-1] INFO  o.h.e.i.StatisticalLoggingSessionEventListener - Session Metrics {
+    74700 nanoseconds spent acquiring 1 JDBC connections;
+    0 nanoseconds spent releasing 0 JDBC connections;
+    109700 nanoseconds spent preparing 1 JDBC statements;
+    572600 nanoseconds spent executing 1 JDBC statements;
+    0 nanoseconds spent executing 0 JDBC batches;
+    0 nanoseconds spent performing 0 L2C puts;
+    0 nanoseconds spent performing 0 L2C hits;
+    0 nanoseconds spent performing 0 L2C misses;
+    0 nanoseconds spent executing 0 flushes (flushing a total of 0 entities and 0 collections);
+    0 nanoseconds spent executing 0 pre-partial-flushes;
+    0 nanoseconds spent executing 0 partial-flushes (flushing a total of 0 entities and 0 collections)
+}
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.o.j.SharedEntityManagerCreator$SharedEntityManagerInvocationHandler - Creating new EntityManager for shared EntityManager invocation
+2025-07-23 14:01:23 [scheduling-1] DEBUG org.hibernate.SQL - 
+    /* <criteria> */ select
+        re1_0.id,
+        re1_0.completed_at,
+        re1_0.created_at,
+        re1_0.event_id,
+        re1_0.message,
+        re1_0.retry_count,
+        re1_0.status,
+        re1_0.updated_at,
+        re1_0.username 
+    from
+        registration_events re1_0 
+    where
+        re1_0.status=?
+2025-07-23 14:01:23 [scheduling-1] INFO  o.h.e.i.StatisticalLoggingSessionEventListener - Session Metrics {
+    75000 nanoseconds spent acquiring 1 JDBC connections;
+    0 nanoseconds spent releasing 0 JDBC connections;
+    153200 nanoseconds spent preparing 1 JDBC statements;
+    595900 nanoseconds spent executing 1 JDBC statements;
+    0 nanoseconds spent executing 0 JDBC batches;
+    0 nanoseconds spent performing 0 L2C puts;
+    0 nanoseconds spent performing 0 L2C hits;
+    0 nanoseconds spent performing 0 L2C misses;
+    0 nanoseconds spent executing 0 flushes (flushing a total of 0 entities and 0 collections);
+    0 nanoseconds spent executing 0 pre-partial-flushes;
+    0 nanoseconds spent executing 0 partial-flushes (flushing a total of 0 entities and 0 collections)
+}
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.o.j.SharedEntityManagerCreator$SharedEntityManagerInvocationHandler - Creating new EntityManager for shared EntityManager invocation
+2025-07-23 14:01:23 [scheduling-1] DEBUG org.hibernate.SQL - 
+    /* <criteria> */ select
+        re1_0.id,
+        re1_0.completed_at,
+        re1_0.created_at,
+        re1_0.event_id,
+        re1_0.message,
+        re1_0.retry_count,
+        re1_0.status,
+        re1_0.updated_at,
+        re1_0.username 
+    from
+        registration_events re1_0 
+    where
+        re1_0.status=?
+2025-07-23 14:01:23 [scheduling-1] INFO  o.h.e.i.StatisticalLoggingSessionEventListener - Session Metrics {
+    120900 nanoseconds spent acquiring 1 JDBC connections;
+    0 nanoseconds spent releasing 0 JDBC connections;
+    152600 nanoseconds spent preparing 1 JDBC statements;
+    475000 nanoseconds spent executing 1 JDBC statements;
+    0 nanoseconds spent executing 0 JDBC batches;
+    0 nanoseconds spent performing 0 L2C puts;
+    0 nanoseconds spent performing 0 L2C hits;
+    0 nanoseconds spent performing 0 L2C misses;
+    0 nanoseconds spent executing 0 flushes (flushing a total of 0 entities and 0 collections);
+    0 nanoseconds spent executing 0 pre-partial-flushes;
+    0 nanoseconds spent executing 0 partial-flushes (flushing a total of 0 entities and 0 collections)
+}
+2025-07-23 14:01:23 [scheduling-1] DEBUG o.s.o.j.SharedEntityManagerCreator$SharedEntityManagerInvocationHandler - Creating new EntityManager for shared EntityManager invocation
+2025-07-23 14:01:23 [scheduling-1] DEBUG org.hibernate.SQL - 
+    /* <criteria> */ select
+        re1_0.id,
+        re1_0.completed_at,
+        re1_0.created_at,
+        re1_0.event_id,
+        re1_0.message,
+        re1_0.retry_count,
+        re1_0.status,
+        re1_0.updated_at,
+        re1_0.username 
+    from
+        registration_events re1_0 
+    where
+        re1_0.status=?
+2025-07-23 14:01:23 [scheduling-1] INFO  o.h.e.i.StatisticalLoggingSessionEventListener - Session Metrics {
+    60900 nanoseconds spent acquiring 1 JDBC connections;
+    0 nanoseconds spent releasing 0 JDBC connections;
+    89200 nanoseconds spent preparing 1 JDBC statements;
+    456300 nanoseconds spent executing 1 JDBC statements;
+    0 nanoseconds spent executing 0 JDBC batches;
+    0 nanoseconds spent performing 0 L2C puts;
+    0 nanoseconds spent performing 0 L2C hits;
+    0 nanoseconds spent performing 0 L2C misses;
+    0 nanoseconds spent executing 0 flushes (flushing a total of 0 entities and 0 collections);
+    0 nanoseconds spent executing 0 pre-partial-flushes;
+    0 nanoseconds spent executing 0 partial-flushes (flushing a total of 0 entities and 0 collections)
+}
+2025-07-23 14:01:23 [scheduling-1] INFO  c.d.l.service.EventTrackingService - Event istatistikleri: total=0, completed=0, failed=0, success rate=0,00%
+2025-07-23 14:01:23 [scheduling-1] WARN  c.d.l.service.ScheduledTasksService - Düşük başarı oranı tespit edildi: 0.0%

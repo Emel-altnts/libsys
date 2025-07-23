@@ -8,7 +8,6 @@ spring:
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
-    # DEBUG: Connection pool ayarları
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
@@ -17,33 +16,29 @@ spring:
       max-lifetime: 1800000
       leak-detection-threshold: 60000
 
-  # JPA/Hibernate Yapılandırması - DEBUG VERSION
+  # JPA/Hibernate Yapılandırması - FIXED VERSION
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    show-sql: true      # SQL sorgularını göster
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
         use_sql_comments: true
-        # DEBUG: Detaylı loglama
         generate_statistics: true
         jdbc:
           batch_size: 20
         order_inserts: true
         order_updates: true
-        # L2 Cache kapatma (debug için)
         cache:
           use_second_level_cache: false
           use_query_cache: false
-        # Transaction debug
         current_session_context_class: thread
-        # ID generation debug
         id:
           new_generator_mappings: true
 
-  # Kafka Yapılandırması
+  # 🚀 FIXED: Kafka Yapılandırması - AUTO_COMMIT aktif
   kafka:
     bootstrap-servers: localhost:9092
     producer:
@@ -53,16 +48,23 @@ spring:
       retries: 3
       retry-backoff-ms: 1000
       request-timeout-ms: 30000
+      properties:
+        enable.idempotence: false
     consumer:
       group-id: libsys-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
-      enable-auto-commit: false
+      # 🚀 CRITICAL FIX: enable-auto-commit TRUE yapıldı
+      enable-auto-commit: true
+      auto-commit-interval: 5000
       properties:
         spring.json.trusted.packages: "com.d_tech.libsys.dto"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: "com.d_tech.libsys.dto.StockOrderEvent"
       listener:
-        ack-mode: manual_immediate
+        # 🚀 CRITICAL FIX: ack-mode RECORD yapıldı (manual_immediate yerine)
+        ack-mode: record
         concurrency: 1
         poll-timeout: 3000
         missing-topics-fatal: false
@@ -76,7 +78,7 @@ app:
       stock-order: stock-order-topic
       invoice: invoice-topic
 
-# DEBUG: Detaylı loglama yapılandırması
+# Detaylı loglama yapılandırması
 logging:
   level:
     root: INFO
@@ -88,25 +90,21 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.type.descriptor.sql.BasicExtractor: TRACE
-    org.hibernate.engine.QueryParameters: DEBUG
-    org.hibernate.engine.query.HQLQueryPlan: DEBUG
     # Spring Data JPA debug
     org.springframework.data.jpa: DEBUG
     # Transaction debug
     org.springframework.transaction: DEBUG
     org.springframework.orm.jpa: DEBUG
-    # Kafka debug
+    # Kafka debug - daha az verbose
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
-    # Security debug (gerekirse)
-    # org.springframework.security: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/libsys-debug.log
 
-# Management endpoints (debug için)
+# Management endpoints
 management:
   endpoints:
     web:
