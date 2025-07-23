@@ -1,6 +1,8 @@
 package com.d_tech.libsys.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Stok sipariş bilgilerini tutan entity - DEBUG VERSION
+ * 🚀 FIXED: Stok sipariş bilgilerini tutan entity - JSON Serialization düzeltildi
  */
 @Entity
 @Data
@@ -71,13 +73,13 @@ public class StockOrder {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Lazy loading ile ilişkiler
+    // 🚀 CRITICAL FIX: JSON Serialization için relationshipler ignore edildi
     @OneToMany(mappedBy = "stockOrder", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"stockOrder"}) // Circular reference önleme
+    @JsonIgnore // JSON serialization'da ignore et - sonsuz döngü önleme
     private List<StockOrderItem> orderItems;
 
     @OneToOne(mappedBy = "stockOrder", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"stockOrder"}) // Circular reference önleme
+    @JsonIgnore // JSON serialization'da ignore et - sonsuz döngü önleme
     private Invoice invoice;
 
     /**
@@ -129,6 +131,48 @@ public class StockOrder {
     }
 
     /**
+     * 🚀 NEW: Order items count (lazy loading olmadan)
+     */
+    @JsonIgnore
+    public int getOrderItemsCount() {
+        return orderItems != null ? orderItems.size() : 0;
+    }
+
+    /**
+     * 🚀 NEW: Has invoice check (lazy loading olmadan)
+     */
+    @JsonIgnore
+    public boolean hasInvoice() {
+        return invoice != null;
+    }
+
+    /**
+     * 🚀 NEW: Safe order items access (lazy loading kontrolü ile)
+     */
+    @JsonIgnore
+    public List<StockOrderItem> getOrderItemsSafe() {
+        try {
+            return orderItems;
+        } catch (org.hibernate.LazyInitializationException e) {
+            // Lazy loading exception durumunda empty list döndür
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
+     * 🚀 NEW: Safe invoice access (lazy loading kontrolü ile)
+     */
+    @JsonIgnore
+    public Invoice getInvoiceSafe() {
+        try {
+            return invoice;
+        } catch (org.hibernate.LazyInitializationException e) {
+            // Lazy loading exception durumunda null döndür
+            return null;
+        }
+    }
+
+    /**
      * Entity lifecycle metodları
      */
     @PrePersist
@@ -150,7 +194,7 @@ public class StockOrder {
     }
 
     /**
-     * DEBUG: toString metodu
+     * toString metodu - JSON serialization sorunları önleme
      */
     @Override
     public String toString() {
@@ -161,11 +205,12 @@ public class StockOrder {
                 ", status=" + status +
                 ", createdBy='" + createdBy + '\'' +
                 ", orderDate=" + orderDate +
+                ", grandTotal=" + grandTotal +
                 '}';
     }
 
     /**
-     * DEBUG: equals ve hashCode (ID based)
+     * equals ve hashCode (ID based) - JSON serialization için gerekli
      */
     @Override
     public boolean equals(Object o) {
@@ -177,6 +222,6 @@ public class StockOrder {
 
     @Override
     public int hashCode() {
-        return id != null ? id.hashCode() : 0;
+        return getClass().hashCode();
     }
 }

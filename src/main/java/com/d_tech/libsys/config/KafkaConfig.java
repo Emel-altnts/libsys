@@ -80,7 +80,7 @@ public class KafkaConfig {
         // JSON deserializer güvenlik ayarları
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.d_tech.libsys.dto");
         configProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.d_tech.libsys.dto.StockOrderEvent");
-        configProps.put(JsonDeserializer.USE_TYPE_HEADERS, false);  // ✅ Eklendi
+
 
         return new DefaultKafkaConsumerFactory<>(configProps);
     }
@@ -123,7 +123,7 @@ public class KafkaConfig {
         // User registration event için özel settings
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.d_tech.libsys.dto");
         configProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.d_tech.libsys.dto.UserRegistrationEvent");
-        configProps.put(JsonDeserializer.USE_TYPE_HEADERS, false);
+
 
         return new DefaultKafkaConsumerFactory<>(configProps);
     }
@@ -162,7 +162,7 @@ public class KafkaConfig {
         // Stock control event için özel settings
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.d_tech.libsys.dto");
         configProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "com.d_tech.libsys.dto.StockControlEvent");
-        configProps.put(JsonDeserializer.USE_TYPE_HEADERS, false);
+
 
         return new DefaultKafkaConsumerFactory<>(configProps);
     }

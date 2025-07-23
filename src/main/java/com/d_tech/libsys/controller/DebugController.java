@@ -239,4 +239,60 @@ public class DebugController {
 
         return ResponseEntity.ok(result);
     }
+
+    // DebugController.java dosyasına eklenecek yeni debug metodu:
+
+    /**
+     * 🚀 NEW: JSON Serialization Test
+     */
+    @GetMapping("/json/test")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> testJsonSerialization() {
+        System.out.println("=== JSON Serialization Test ===");
+
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // Tek bir sipariş getir
+            List<StockOrder> allOrders = stockOrderRepository.findAll();
+            result.put("totalOrders", allOrders.size());
+
+            if (!allOrders.isEmpty()) {
+                StockOrder firstOrder = allOrders.get(0);
+
+                // Temel bilgileri test et
+                Map<String, Object> orderInfo = new HashMap<>();
+                orderInfo.put("id", firstOrder.getId());
+                orderInfo.put("orderNumber", firstOrder.getOrderNumber());
+                orderInfo.put("supplierName", firstOrder.getSupplierName());
+                orderInfo.put("status", firstOrder.getStatus().toString());
+                orderInfo.put("createdBy", firstOrder.getCreatedBy());
+                orderInfo.put("orderDate", firstOrder.getOrderDate().toString());
+
+                // Lazy loading test
+                try {
+                    int itemCount = firstOrder.getOrderItems() != null ? firstOrder.getOrderItems().size() : 0;
+                    orderInfo.put("orderItemsCount", itemCount);
+                    orderInfo.put("lazyLoadingWorks", true);
+                } catch (Exception e) {
+                    orderInfo.put("orderItemsCount", "LAZY_LOADING_ERROR");
+                    orderInfo.put("lazyLoadingWorks", false);
+                    orderInfo.put("lazyError", e.getMessage());
+                }
+
+                result.put("firstOrder", orderInfo);
+                result.put("success", true);
+            } else {
+                result.put("message", "No orders found");
+                result.put("success", false);
+            }
+
+        } catch (Exception e) {
+            result.put("error", e.getMessage());
+            result.put("success", false);
+            e.printStackTrace();
+        }
+
+        return ResponseEntity.ok(result);
+    }
 }

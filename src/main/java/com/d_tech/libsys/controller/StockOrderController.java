@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Stok sipariş yönetim controller'ı - DEBUG VERSION
+ * 🚀 FIXED: Stok sipariş yönetim controller'ı - JSON Serialization ve ID sorunları düzeltildi
  */
 @RestController
 @RequestMapping("/api/stock/orders")
@@ -121,62 +121,69 @@ public class StockOrderController {
     }
 
     /**
-     * Sipariş detayını getir - DEBUG VERSION WITH DETAILED LOGGING
+     * 🚀 FIXED: Sipariş detayını getir - Simplified JSON Response
      */
     @GetMapping("/{orderId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StockOrder> getOrder(@PathVariable Long orderId) {
-        System.out.println("=== DEBUG: Sipariş detayı istendi ===");
+    public ResponseEntity<?> getOrder(@PathVariable Long orderId) {
+        System.out.println("=== FIXED: Sipariş detayı istendi ===");
         System.out.println("🔍 Aranan Order ID: " + orderId);
-        System.out.println("🔍 ID Type: " + orderId.getClass().getSimpleName());
-        System.out.println("🔍 ID Value: " + orderId);
 
         log.info("Sipariş detayı istendi: orderId={}", orderId);
 
         try {
-            // Debug: Önce ID'nin gerçek varlığını kontrol et
-            System.out.println("🔍 StockOrderService'ten sipariş aranıyor...");
-
             Optional<StockOrder> orderOpt = stockOrderService.getOrderById(orderId);
-
-            System.out.println("🔍 Service sonucu: " + (orderOpt.isPresent() ? "BULUNDU" : "BULUNAMADI"));
 
             if (orderOpt.isPresent()) {
                 StockOrder order = orderOpt.get();
-                System.out.println("✅ Sipariş bulundu:");
-                System.out.println("   ├── ID: " + order.getId());
-                System.out.println("   ├── Order Number: " + order.getOrderNumber());
-                System.out.println("   ├── Supplier: " + order.getSupplierName());
-                System.out.println("   ├── Status: " + order.getStatus());
-                System.out.println("   └── Created By: " + order.getCreatedBy());
+                System.out.println("✅ Sipariş bulundu: ID=" + order.getId() + ", OrderNumber=" + order.getOrderNumber());
 
-                return ResponseEntity.ok(order);
+                // 🚀 CRITICAL FIX: Simplified DTO Response to avoid JSON serialization issues
+                OrderResponseDto response = OrderResponseDto.builder()
+                        .id(order.getId())
+                        .orderNumber(order.getOrderNumber())
+                        .supplierName(order.getSupplierName())
+                        .supplierContact(order.getSupplierContact())
+                        .orderDate(order.getOrderDate())
+                        .expectedDeliveryDate(order.getExpectedDeliveryDate())
+                        .actualDeliveryDate(order.getActualDeliveryDate())
+                        .status(order.getStatus().toString())
+                        .totalAmount(order.getTotalAmount())
+                        .totalVat(order.getTotalVat())
+                        .grandTotal(order.getGrandTotal())
+                        .notes(order.getNotes())
+                        .createdBy(order.getCreatedBy())
+                        .createdAt(order.getCreatedAt())
+                        .updatedAt(order.getUpdatedAt())
+                        // Order items count (lazy loading issue önleme)
+                        .orderItemsCount(order.getOrderItems() != null ? order.getOrderItems().size() : 0)
+                        .hasInvoice(order.getInvoice() != null)
+                        .build();
+
+                return ResponseEntity.ok(response);
+
             } else {
                 System.out.println("❌ Sipariş bulunamadı: orderId=" + orderId);
 
-                // DEBUG: Veritabanında hangi ID'ler var kontrol et
+                // DEBUG: Mevcut siparişleri listele
                 try {
-                    List<StockOrder> allOrders = stockOrderService.getAllOrdersForDebug(); // Bu metodu ekleyeceğiz
-                    System.out.println("📊 Veritabanındaki tüm sipariş ID'leri:");
-                    allOrders.forEach(o -> System.out.println("   - ID: " + o.getId() +
-                            ", OrderNumber: " + o.getOrderNumber() +
-                            ", Supplier: " + o.getSupplierName()));
+                    List<StockOrder> allOrders = stockOrderService.getAllOrdersForDebug();
+                    System.out.println("📊 Mevcut sipariş sayısı: " + allOrders.size());
+                    allOrders.stream().limit(5).forEach(o ->
+                            System.out.println("   - ID: " + o.getId() + ", OrderNumber: " + o.getOrderNumber())
+                    );
                 } catch (Exception debugEx) {
-                    System.out.println("⚠️ Debug sorgusu çalışmadı: " + debugEx.getMessage());
+                    System.out.println("⚠️ Debug sorgusu başarısız: " + debugEx.getMessage());
                 }
 
                 return ResponseEntity.notFound().build();
             }
 
         } catch (Exception e) {
-            System.out.println("💥 Sipariş detayı getirilirken hata:");
-            System.out.println("   ├── Exception: " + e.getClass().getSimpleName());
-            System.out.println("   ├── Message: " + e.getMessage());
-            System.out.println("   └── Cause: " + (e.getCause() != null ? e.getCause().getMessage() : "null"));
-
+            System.out.println("💥 Sipariş detayı getirilirken hata: " + e.getMessage());
             log.error("Sipariş detayı getirme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
             e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
+            return ResponseEntity.internalServerError().body("Sipariş detayı getirilirken hata oluştu");
         }
     }
 
@@ -194,11 +201,11 @@ public class StockOrderController {
     }
 
     /**
-     * Duruma göre siparişleri listele - DEBUG VERSION
+     * Duruma göre siparişleri listele
      */
     @GetMapping("/status/{status}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<StockOrder>> getOrdersByStatus(@PathVariable String status) {
+    public ResponseEntity<List<OrderSummaryDto>> getOrdersByStatus(@PathVariable String status) {
         System.out.println("🔍 Duruma göre siparişler istendi: status=" + status);
         log.info("Duruma göre siparişler istendi: status={}", status);
 
@@ -207,24 +214,30 @@ public class StockOrderController {
             List<StockOrder> orders = stockOrderService.getOrdersByStatus(orderStatus);
 
             System.out.println("📊 Bulunan sipariş sayısı: " + orders.size());
-            orders.forEach(o -> System.out.println("   - ID: " + o.getId() +
-                    ", Status: " + o.getStatus() +
-                    ", Supplier: " + o.getSupplierName()));
 
-            return ResponseEntity.ok(orders);
+            // 🚀 FIXED: Simplified DTO to avoid JSON serialization issues
+            List<OrderSummaryDto> response = orders.stream()
+                    .map(this::toOrderSummaryDto)
+                    .toList();
+
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             System.out.println("❌ Geçersiz sipariş durumu: " + status);
             log.warn("Geçersiz sipariş durumu: {}", status);
             return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            System.out.println("💥 Siparişler getirilirken hata: " + e.getMessage());
+            log.error("Siparişler getirme hatası: status={}, error={}", status, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 
     /**
-     * Bekleyen siparişleri listele - DEBUG VERSION
+     * 🚀 FIXED: Bekleyen siparişleri listele - Simplified JSON Response
      */
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<StockOrder>> getPendingOrders() {
+    public ResponseEntity<List<OrderSummaryDto>> getPendingOrders() {
         System.out.println("🔍 Bekleyen siparişler istendi");
         log.info("Bekleyen siparişler istendi");
 
@@ -232,22 +245,47 @@ public class StockOrderController {
             List<StockOrder> orders = stockOrderService.getPendingOrders();
 
             System.out.println("📊 Bekleyen sipariş sayısı: " + orders.size());
-            orders.forEach(o -> {
-                System.out.println("   📦 Sipariş:");
-                System.out.println("      ├── ID: " + o.getId());
-                System.out.println("      ├── Order Number: " + o.getOrderNumber());
-                System.out.println("      ├── Supplier: " + o.getSupplierName());
-                System.out.println("      ├── Status: " + o.getStatus());
-                System.out.println("      ├── Created By: " + o.getCreatedBy());
-                System.out.println("      └── Order Date: " + o.getOrderDate());
-            });
 
-            return ResponseEntity.ok(orders);
+            // 🚀 CRITICAL FIX: Convert to simplified DTOs to avoid JSON serialization issues
+            List<OrderSummaryDto> response = orders.stream()
+                    .map(this::toOrderSummaryDto)
+                    .toList();
+
+            // Debug: İlk siparişin detaylarını yazdır
+            if (!response.isEmpty()) {
+                OrderSummaryDto firstOrder = response.get(0);
+                System.out.println("📦 İlk sipariş detayları:");
+                System.out.println("   ├── ID: " + firstOrder.getId());
+                System.out.println("   ├── Order Number: " + firstOrder.getOrderNumber());
+                System.out.println("   ├── Supplier: " + firstOrder.getSupplierName());
+                System.out.println("   ├── Status: " + firstOrder.getStatus());
+                System.out.println("   └── Created By: " + firstOrder.getCreatedBy());
+            }
+
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
             System.out.println("💥 Bekleyen siparişler getirilirken hata: " + e.getMessage());
             log.error("Bekleyen siparişler getirme hatası: {}", e.getMessage(), e);
+            e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    /**
+     * 🚀 NEW: Helper method to convert StockOrder to OrderSummaryDto
+     */
+    private OrderSummaryDto toOrderSummaryDto(StockOrder order) {
+        return OrderSummaryDto.builder()
+                .id(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .supplierName(order.getSupplierName())
+                .orderDate(order.getOrderDate())
+                .expectedDeliveryDate(order.getExpectedDeliveryDate())
+                .status(order.getStatus().toString())
+                .grandTotal(order.getGrandTotal())
+                .createdBy(order.getCreatedBy())
+                .build();
     }
 
     /**
@@ -255,11 +293,19 @@ public class StockOrderController {
      */
     @GetMapping("/overdue")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<StockOrder>> getOverdueOrders() {
+    public ResponseEntity<List<OrderSummaryDto>> getOverdueOrders() {
         log.info("Vadesi geçen siparişler istendi");
 
-        List<StockOrder> orders = stockOrderService.getOverdueOrders();
-        return ResponseEntity.ok(orders);
+        try {
+            List<StockOrder> orders = stockOrderService.getOverdueOrders();
+            List<OrderSummaryDto> response = orders.stream()
+                    .map(this::toOrderSummaryDto)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Vadesi geçen siparişler getirme hatası: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -267,11 +313,19 @@ public class StockOrderController {
      */
     @GetMapping("/supplier/{supplierName}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<StockOrder>> getOrdersBySupplier(@PathVariable String supplierName) {
+    public ResponseEntity<List<OrderSummaryDto>> getOrdersBySupplier(@PathVariable String supplierName) {
         log.info("Tedarikçiye göre siparişler istendi: supplier={}", supplierName);
 
-        List<StockOrder> orders = stockOrderService.getOrdersBySupplier(supplierName);
-        return ResponseEntity.ok(orders);
+        try {
+            List<StockOrder> orders = stockOrderService.getOrdersBySupplier(supplierName);
+            List<OrderSummaryDto> response = orders.stream()
+                    .map(this::toOrderSummaryDto)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Tedarikçi siparişleri getirme hatası: supplier={}, error={}", supplierName, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -279,11 +333,19 @@ public class StockOrderController {
      */
     @GetMapping("/my-orders")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<StockOrder>> getMyOrders(Authentication authentication) {
+    public ResponseEntity<List<OrderSummaryDto>> getMyOrders(Authentication authentication) {
         log.info("Kullanıcı siparişleri istendi: user={}", authentication.getName());
 
-        List<StockOrder> orders = stockOrderService.getOrdersByUser(authentication.getName());
-        return ResponseEntity.ok(orders);
+        try {
+            List<StockOrder> orders = stockOrderService.getOrdersByUser(authentication.getName());
+            List<OrderSummaryDto> response = orders.stream()
+                    .map(this::toOrderSummaryDto)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Kullanıcı siparişleri getirme hatası: user={}, error={}", authentication.getName(), e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -291,7 +353,7 @@ public class StockOrderController {
      */
     @PostMapping("/{orderId}/cancel")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StockOrder> cancelOrder(
+    public ResponseEntity<OrderResponseDto> cancelOrder(
             @PathVariable Long orderId,
             @RequestBody CancelOrderRequest request) {
 
@@ -299,7 +361,15 @@ public class StockOrderController {
 
         try {
             StockOrder cancelledOrder = stockOrderService.cancelOrder(orderId, request.getReason());
-            return ResponseEntity.ok(cancelledOrder);
+
+            OrderResponseDto response = OrderResponseDto.builder()
+                    .id(cancelledOrder.getId())
+                    .orderNumber(cancelledOrder.getOrderNumber())
+                    .status(cancelledOrder.getStatus().toString())
+                    .notes(cancelledOrder.getNotes())
+                    .build();
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Sipariş iptal hatası: orderId={}, error={}", orderId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
@@ -324,5 +394,50 @@ public class StockOrderController {
     @lombok.Data
     public static class CancelOrderRequest {
         private String reason;
+    }
+
+    /**
+     * 🚀 NEW: Simplified Order Summary DTO for list endpoints
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class OrderSummaryDto {
+        private Long id;
+        private String orderNumber;
+        private String supplierName;
+        private java.time.LocalDateTime orderDate;
+        private java.time.LocalDateTime expectedDeliveryDate;
+        private String status;
+        private java.math.BigDecimal grandTotal;
+        private String createdBy;
+    }
+
+    /**
+     * 🚀 NEW: Complete Order Response DTO for detail endpoint
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class OrderResponseDto {
+        private Long id;
+        private String orderNumber;
+        private String supplierName;
+        private String supplierContact;
+        private java.time.LocalDateTime orderDate;
+        private java.time.LocalDateTime expectedDeliveryDate;
+        private java.time.LocalDateTime actualDeliveryDate;
+        private String status;
+        private java.math.BigDecimal totalAmount;
+        private java.math.BigDecimal totalVat;
+        private java.math.BigDecimal grandTotal;
+        private String notes;
+        private String createdBy;
+        private java.time.LocalDateTime createdAt;
+        private java.time.LocalDateTime updatedAt;
+        private Integer orderItemsCount;
+        private Boolean hasInvoice;
     }
 }
