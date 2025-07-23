@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * StockOrder repository
+ * StockOrder repository - DEBUG VERSION
  */
 @Repository
 public interface StockOrderRepository extends JpaRepository<StockOrder, Long> {
@@ -58,5 +58,36 @@ public interface StockOrderRepository extends JpaRepository<StockOrder, Long> {
      * Sipariş numarası var mı kontrolü
      */
     boolean existsByOrderNumber(String orderNumber);
-}
 
+    // DEBUG METODLARI
+
+    /**
+     * DEBUG: ID'nin var olup olmadığını kontrol eder
+     */
+    @Query("SELECT COUNT(so) > 0 FROM StockOrder so WHERE so.id = :id")
+    boolean debugExistsById(@Param("id") Long id);
+
+    /**
+     * DEBUG: ID ile sipariş detayları getir (native query)
+     */
+    @Query(value = "SELECT * FROM stock_orders WHERE id = :id", nativeQuery = true)
+    Optional<StockOrder> debugFindByIdNative(@Param("id") Long id);
+
+    /**
+     * DEBUG: Tüm ID'leri listele
+     */
+    @Query("SELECT so.id FROM StockOrder so ORDER BY so.id")
+    List<Long> debugGetAllIds();
+
+    /**
+     * DEBUG: ID ve Order Number eşleştirmesi
+     */
+    @Query("SELECT so.id, so.orderNumber FROM StockOrder so ORDER BY so.id")
+    List<Object[]> debugGetIdAndOrderNumber();
+
+    /**
+     * DEBUG: Belirli ID aralığındaki siparişleri getir
+     */
+    @Query("SELECT so FROM StockOrder so WHERE so.id BETWEEN :minId AND :maxId ORDER BY so.id")
+    List<StockOrder> debugFindByIdRange(@Param("minId") Long minId, @Param("maxId") Long maxId);
+}

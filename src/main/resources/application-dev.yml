@@ -1,30 +1,51 @@
 server:
-  port: 9090  # Bu doğru yer - kök seviyede olmalı
+  port: 9090
 
 spring:
-
   # PostgreSQL Veritabanı Yapılandırması
   datasource:
     url: jdbc:postgresql://localhost:5432/postgres
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
+    # DEBUG: Connection pool ayarları
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
 
-  # JPA/Hibernate Yapılandırması
+  # JPA/Hibernate Yapılandırması - DEBUG VERSION
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update  # Tabloları otomatik oluştur/güncelle
-    show-sql: true      # SQL sorgularını konsola yazdır
+      ddl-auto: update
+    show-sql: true      # SQL sorgularını göster
     properties:
       hibernate:
         format_sql: true
-  # Server Port Yapılandırması
+        use_sql_comments: true
+        # DEBUG: Detaylı loglama
+        generate_statistics: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        # L2 Cache kapatma (debug için)
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+        # Transaction debug
+        current_session_context_class: thread
+        # ID generation debug
+        id:
+          new_generator_mappings: true
 
-
-  # Kafka Yapılandırması (Port düzeltmesi)
+  # Kafka Yapılandırması
   kafka:
-    bootstrap-servers: localhost:9092  # Doğru port
+    bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -32,23 +53,67 @@ spring:
       retries: 3
       retry-backoff-ms: 1000
       request-timeout-ms: 30000
-
-      -30,6 +49,19 @@ spring:
-        listener:
-          ack-mode: manual_immediate
-          concurrency: 1
-          poll-timeout: 3000
-          missing-topics-fatal: false
+    consumer:
+      group-id: libsys-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: "com.d_tech.libsys.dto"
+      listener:
+        ack-mode: manual_immediate
+        concurrency: 1
+        poll-timeout: 3000
+        missing-topics-fatal: false
 
 # Uygulama özel yapılandırmaları
 app:
   kafka:
     topic:
       user-registration: user-registration-topic
+      stock-control: stock-control-topic
+      stock-order: stock-order-topic
+      invoice: invoice-topic
 
-# Loglama yapılandırması
+# DEBUG: Detaylı loglama yapılandırması
 logging:
   level:
+    root: INFO
     com.d_tech.libsys: DEBUG
+    com.d_tech.libsys.controller: DEBUG
+    com.d_tech.libsys.service: DEBUG
+    com.d_tech.libsys.repository: DEBUG
+    # Hibernate debug
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.type.descriptor.sql.BasicExtractor: TRACE
+    org.hibernate.engine.QueryParameters: DEBUG
+    org.hibernate.engine.query.HQLQueryPlan: DEBUG
+    # Spring Data JPA debug
+    org.springframework.data.jpa: DEBUG
+    # Transaction debug
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    # Kafka debug
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
+    # Security debug (gerekirse)
+    # org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/libsys-debug.log
+
+# Management endpoints (debug için)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,beans,mappings,env
+  endpoint:
+    health:
+      show-details: always
+    loggers:
+      enabled: true

@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Stok sipariş yönetim controller'ı
+ * Stok sipariş yönetim controller'ı - DEBUG VERSION
  */
 @RestController
 @RequestMapping("/api/stock/orders")
@@ -121,16 +121,63 @@ public class StockOrderController {
     }
 
     /**
-     * Sipariş detayını getir
+     * Sipariş detayını getir - DEBUG VERSION WITH DETAILED LOGGING
      */
     @GetMapping("/{orderId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<StockOrder> getOrder(@PathVariable Long orderId) {
+        System.out.println("=== DEBUG: Sipariş detayı istendi ===");
+        System.out.println("🔍 Aranan Order ID: " + orderId);
+        System.out.println("🔍 ID Type: " + orderId.getClass().getSimpleName());
+        System.out.println("🔍 ID Value: " + orderId);
+
         log.info("Sipariş detayı istendi: orderId={}", orderId);
 
-        Optional<StockOrder> order = stockOrderService.getOrderById(orderId);
-        return order.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            // Debug: Önce ID'nin gerçek varlığını kontrol et
+            System.out.println("🔍 StockOrderService'ten sipariş aranıyor...");
+
+            Optional<StockOrder> orderOpt = stockOrderService.getOrderById(orderId);
+
+            System.out.println("🔍 Service sonucu: " + (orderOpt.isPresent() ? "BULUNDU" : "BULUNAMADI"));
+
+            if (orderOpt.isPresent()) {
+                StockOrder order = orderOpt.get();
+                System.out.println("✅ Sipariş bulundu:");
+                System.out.println("   ├── ID: " + order.getId());
+                System.out.println("   ├── Order Number: " + order.getOrderNumber());
+                System.out.println("   ├── Supplier: " + order.getSupplierName());
+                System.out.println("   ├── Status: " + order.getStatus());
+                System.out.println("   └── Created By: " + order.getCreatedBy());
+
+                return ResponseEntity.ok(order);
+            } else {
+                System.out.println("❌ Sipariş bulunamadı: orderId=" + orderId);
+
+                // DEBUG: Veritabanında hangi ID'ler var kontrol et
+                try {
+                    List<StockOrder> allOrders = stockOrderService.getAllOrdersForDebug(); // Bu metodu ekleyeceğiz
+                    System.out.println("📊 Veritabanındaki tüm sipariş ID'leri:");
+                    allOrders.forEach(o -> System.out.println("   - ID: " + o.getId() +
+                            ", OrderNumber: " + o.getOrderNumber() +
+                            ", Supplier: " + o.getSupplierName()));
+                } catch (Exception debugEx) {
+                    System.out.println("⚠️ Debug sorgusu çalışmadı: " + debugEx.getMessage());
+                }
+
+                return ResponseEntity.notFound().build();
+            }
+
+        } catch (Exception e) {
+            System.out.println("💥 Sipariş detayı getirilirken hata:");
+            System.out.println("   ├── Exception: " + e.getClass().getSimpleName());
+            System.out.println("   ├── Message: " + e.getMessage());
+            System.out.println("   └── Cause: " + (e.getCause() != null ? e.getCause().getMessage() : "null"));
+
+            log.error("Sipariş detayı getirme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -147,33 +194,60 @@ public class StockOrderController {
     }
 
     /**
-     * Duruma göre siparişleri listele
+     * Duruma göre siparişleri listele - DEBUG VERSION
      */
     @GetMapping("/status/{status}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<StockOrder>> getOrdersByStatus(@PathVariable String status) {
+        System.out.println("🔍 Duruma göre siparişler istendi: status=" + status);
         log.info("Duruma göre siparişler istendi: status={}", status);
 
         try {
             StockOrder.OrderStatus orderStatus = StockOrder.OrderStatus.valueOf(status.toUpperCase());
             List<StockOrder> orders = stockOrderService.getOrdersByStatus(orderStatus);
+
+            System.out.println("📊 Bulunan sipariş sayısı: " + orders.size());
+            orders.forEach(o -> System.out.println("   - ID: " + o.getId() +
+                    ", Status: " + o.getStatus() +
+                    ", Supplier: " + o.getSupplierName()));
+
             return ResponseEntity.ok(orders);
         } catch (IllegalArgumentException e) {
+            System.out.println("❌ Geçersiz sipariş durumu: " + status);
             log.warn("Geçersiz sipariş durumu: {}", status);
             return ResponseEntity.badRequest().build();
         }
     }
 
     /**
-     * Bekleyen siparişleri listele
+     * Bekleyen siparişleri listele - DEBUG VERSION
      */
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<StockOrder>> getPendingOrders() {
+        System.out.println("🔍 Bekleyen siparişler istendi");
         log.info("Bekleyen siparişler istendi");
 
-        List<StockOrder> orders = stockOrderService.getPendingOrders();
-        return ResponseEntity.ok(orders);
+        try {
+            List<StockOrder> orders = stockOrderService.getPendingOrders();
+
+            System.out.println("📊 Bekleyen sipariş sayısı: " + orders.size());
+            orders.forEach(o -> {
+                System.out.println("   📦 Sipariş:");
+                System.out.println("      ├── ID: " + o.getId());
+                System.out.println("      ├── Order Number: " + o.getOrderNumber());
+                System.out.println("      ├── Supplier: " + o.getSupplierName());
+                System.out.println("      ├── Status: " + o.getStatus());
+                System.out.println("      ├── Created By: " + o.getCreatedBy());
+                System.out.println("      └── Order Date: " + o.getOrderDate());
+            });
+
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            System.out.println("💥 Bekleyen siparişler getirilirken hata: " + e.getMessage());
+            log.error("Bekleyen siparişler getirme hatası: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
