@@ -35,9 +35,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
         System.out.println("🔍 JWT Filter - İşlenen istek: " + method + " " + requestUri);
 
-        // GET /api/stock/** istekleri için özel kontrol
-        if ("GET".equals(method) && requestUri.startsWith("/api/stock/")) {
-            System.out.println("✅ GET /api/stock/** isteği - JWT kontrolü atlanıyor (permitAll)");
+        // Public endpoint'ler için JWT kontrolü yapmadan geç
+        if (isPublicEndpoint(method, requestUri)) {
+            System.out.println("✅ Public endpoint - JWT kontrolü atlanıyor: " + requestUri);
             filterChain.doFilter(request, response);
             return;
         }
@@ -47,15 +47,18 @@ public class JwtFilter extends OncePerRequestFilter {
         String username = null;
 
         System.out.println("🔐 Authorization Header: " +
-                (authHeader != null ? authHeader.substring(0, Math.min(authHeader.length(), 20)) + "..." : "YOK"));
+                (authHeader != null ? "Bearer " + authHeader.substring(7, Math.min(authHeader.length(), 20)) + "..." : "YOK"));
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
+            System.out.println("🎟️ Token alındı, uzunluk: " + token.length());
+
             try {
                 username = jwtUtil.extractUsername(token);
                 System.out.println("👤 Token'dan çıkarılan username: " + username);
             } catch (Exception e) {
                 System.out.println("❌ Token parse hatası: " + e.getMessage());
+                // Token parse hatası - devam et, Spring Security handle edecek
             }
         } else {
             System.out.println("⚠️ Bearer token bulunamadı");
@@ -89,12 +92,34 @@ public class JwtFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 System.out.println("❌ User details yükleme hatası: " + e.getMessage());
             }
-        } else if (username == null) {
-            System.out.println("⚠️ Token'dan username çıkarılamadı");
-        } else {
-            System.out.println("ℹ️ Zaten authentication mevcut");
+        } else if (username == null && authHeader != null) {
+            System.out.println("⚠️ Token var ama username çıkarılamadı");
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Public endpoint kontrolü
+     */
+    private boolean isPublicEndpoint(String method, String uri) {
+        // Auth endpoint'leri
+        if (uri.startsWith("/api/auth/")) {
+            return true;
+        }
+
+        // Message endpoint
+        if (uri.equals("/message")) {
+            return true;
+        }
+
+        // GET requests for read-only operations
+        if ("GET".equals(method)) {
+            return uri.startsWith("/api/books/") ||
+                    uri.startsWith("/api/stock/") ||
+                    uri.startsWith("/api/invoices/");
+        }
+
+        return false;
     }
 }

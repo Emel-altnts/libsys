@@ -17,7 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true) // ✅ Method security aktif
 public class SecurityConfig {
 
     @Bean
@@ -44,14 +44,17 @@ public class SecurityConfig {
                                                    DaoAuthenticationProvider authProvider,
                                                    JwtFilter jwtFilter) throws Exception {
 
-        System.out.println("🔐 SecurityFilterChain yapılandırılıyor...");
+        System.out.println("🔐 SecurityFilterChain with Authentication yapılandırılıyor...");
 
         http
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (request, response, authException) -> {
-                            System.out.println("❌ 401 Unauthorized: " + request.getRequestURI());
-                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Yetkisiz giriş!");
+                            System.out.println("❌ 401 Unauthorized: " + request.getRequestURI() +
+                                    " - " + authException.getMessage());
+                            response.setContentType("application/json");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"JWT token gerekli\"}");
                         }
                 ))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -62,24 +65,22 @@ public class SecurityConfig {
                             // Herkese açık endpoint'ler
                             .requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()
-
-                            // ✅ STOK ENDPOINT'LERİNİ HERKESE AÇ (TEST İÇİN)
-                            .requestMatchers(HttpMethod.POST, "/api/stock/**").permitAll()
-                            .requestMatchers(HttpMethod.PUT, "/api/stock/**").permitAll()
-                            .requestMatchers(HttpMethod.DELETE, "/api/stock/**").permitAll()
-
                             .requestMatchers("/message").permitAll()
+
+                            // Sadece READ işlemleri için GET endpoint'leri serbest
+                            .requestMatchers(HttpMethod.GET, "/api/stock/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/stock/orders/**").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/invoices/**").permitAll()
 
                             // Diğer tüm istekler authentication gerektirir
                             .anyRequest().authenticated();
 
-                    System.out.println("✅ Stok endpoint'leri herkese açık olarak ayarlandı");
+                    System.out.println("✅ Authentication gerekli endpoint'ler ayarlandı");
                 })
                 .authenticationProvider(authProvider)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
-        System.out.println("🎯 SecurityFilterChain yapılandırması tamamlandı!");
+        System.out.println("🎯 SecurityFilterChain with Authentication tamamlandı!");
         return http.build();
     }
 }
