@@ -75,6 +75,7 @@ public class SecurityConfig {
                             .requestMatchers("/api/auth/**").permitAll()
                             .requestMatchers("/message").permitAll()
                             .requestMatchers("/error").permitAll()
+                            .requestMatchers("/h2-console/**").permitAll()
 
                             // 🔓 TEMPORARY: Test için tüm endpoint'leri authenticated yap (ADMIN role check yok)
                             .requestMatchers(HttpMethod.GET, "/api/**").authenticated()

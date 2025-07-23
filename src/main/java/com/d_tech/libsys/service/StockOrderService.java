@@ -129,156 +129,90 @@ public class StockOrderService {
     }
 
     /**
-     * 🚀 FIXED: Sipariş detayını getir - ENHANCED VERSION WITH MULTIPLE STRATEGIES
+     * 🚀 FIXED: Sipariş detayını getir - SIMPLIFIED AND ROBUST VERSION
      */
     @Transactional(readOnly = true)
     public Optional<StockOrder> getOrderById(Long orderId) {
-        System.out.println("=== StockOrderService.getOrderById FIXED VERSION ===");
+        System.out.println("=== StockOrderService.getOrderById SIMPLIFIED VERSION ===");
         System.out.println("🔍 Aranan ID: " + orderId);
-        System.out.println("🔍 ID Type: " + (orderId != null ? orderId.getClass().getSimpleName() : "null"));
 
         log.info("Sipariş detayı getiriliyor: orderId={}", orderId);
 
         try {
-            // ✅ 1. Input validation
+            // ✅ Input validation
             if (orderId == null || orderId <= 0) {
                 System.out.println("❌ Geçersiz orderId: " + orderId);
                 log.warn("Geçersiz orderId: {}", orderId);
                 return Optional.empty();
             }
 
-            // ✅ 2. EntityManager flush - pending changes'i commit et
-            System.out.println("🔍 EntityManager flush yapılıyor...");
-            entityManager.flush();
-
-            // ✅ 3. İlk arama - standart repository metodu
-            System.out.println("🔍 Strategy 1: Repository.findById...");
+            // ✅ Simple approach - direct repository call
+            System.out.println("🔍 Repository.findById çağrılıyor...");
             Optional<StockOrder> result = stockOrderRepository.findById(orderId);
 
             if (result.isPresent()) {
                 StockOrder order = result.get();
-                System.out.println("✅ Strategy 1 SUCCESS: ID=" + order.getId() + ", OrderNumber=" + order.getOrderNumber());
-                log.info("Sipariş bulundu (Strategy 1): orderId={}, orderNumber={}", orderId, order.getOrderNumber());
+                System.out.println("✅ Sipariş bulundu: ID=" + order.getId() + ", OrderNumber=" + order.getOrderNumber());
+                log.info("Sipariş bulundu: orderId={}, orderNumber={}", orderId, order.getOrderNumber());
                 return result;
-            }
-
-            // ✅ 4. Strategy 2 - Cache clear ve tekrar dene
-            System.out.println("🔍 Strategy 2: Cache clear + retry...");
-            entityManager.clear();
-            result = stockOrderRepository.findById(orderId);
-
-            if (result.isPresent()) {
-                StockOrder order = result.get();
-                System.out.println("✅ Strategy 2 SUCCESS: Cache clear sonrası bulundu");
-                log.info("Sipariş bulundu (Strategy 2 - Cache Clear): orderId={}, orderNumber={}", orderId, order.getOrderNumber());
-                return result;
-            }
-
-            // ✅ 5. Strategy 3 - Native query
-            System.out.println("🔍 Strategy 3: Native query...");
-            try {
-                Query nativeQuery = entityManager.createNativeQuery(
-                        "SELECT * FROM stock_orders WHERE id = ?", StockOrder.class);
-                nativeQuery.setParameter(1, orderId);
-
-                StockOrder order = (StockOrder) nativeQuery.getSingleResult();
-                System.out.println("✅ Strategy 3 SUCCESS: Native query ile bulundu - " + order.getOrderNumber());
-                log.info("Sipariş bulundu (Strategy 3 - Native): orderId={}, orderNumber={}", orderId, order.getOrderNumber());
-                return Optional.of(order);
-
-            } catch (NoResultException e) {
-                System.out.println("❌ Strategy 3 FAILED: Native query ile de bulunamadı");
-            }
-
-            // ✅ 6. Strategy 4 - Debug repository metodu
-            System.out.println("🔍 Strategy 4: Debug repository metodu...");
-            try {
-                Optional<StockOrder> debugResult = stockOrderRepository.debugFindByIdNative(orderId);
-                if (debugResult.isPresent()) {
-                    StockOrder order = debugResult.get();
-                    System.out.println("✅ Strategy 4 SUCCESS: Debug native query ile bulundu");
-                    log.info("Sipariş bulundu (Strategy 4 - Debug): orderId={}, orderNumber={}", orderId, order.getOrderNumber());
-                    return debugResult;
+            } else {
+                System.out.println("❌ Sipariş bulunamadı - alternatif yöntemler deneniyor...");
+                
+                // Try with native query as fallback
+                try {
+                    StockOrder order = (StockOrder) entityManager.createNativeQuery(
+                            "SELECT * FROM stock_orders WHERE id = ?", StockOrder.class)
+                            .setParameter(1, orderId)
+                            .getSingleResult();
+                    
+                    System.out.println("✅ Native query ile bulundu: " + order.getOrderNumber());
+                    return Optional.of(order);
+                } catch (Exception nativeEx) {
+                    System.out.println("❌ Native query ile de bulunamadı");
                 }
-            } catch (Exception debugEx) {
-                System.out.println("⚠️ Strategy 4 ERROR: " + debugEx.getMessage());
+                
+                // Final debug info
+                printSimpleDebugInfo(orderId);
+                return Optional.empty();
             }
-
-            // ✅ 7. Final check - existsById kontrolü
-            System.out.println("🔍 Final Check: existsById...");
-            boolean exists = stockOrderRepository.existsById(orderId);
-            System.out.println("🔍 ExistsById sonucu: " + exists);
-
-            if (exists) {
-                System.out.println("⚠️ PARADOX: ID var ama hiçbir strategy ile bulunamadı!");
-                log.error("PARADOX: Order exists but not found with any strategy: orderId={}", orderId);
-
-                // Son çare - tüm siparişleri getir ve manuel ara
-                List<StockOrder> allOrders = stockOrderRepository.findAll();
-                Optional<StockOrder> manualFind = allOrders.stream()
-                        .filter(o -> o.getId().equals(orderId))
-                        .findFirst();
-
-                if (manualFind.isPresent()) {
-                    System.out.println("✅ MANUAL SEARCH SUCCESS!");
-                    return manualFind;
-                }
-            }
-
-            // ✅ 8. Son durum - bulunamadı
-            System.out.println("❌ FINAL RESULT: Sipariş hiçbir yöntemle bulunamadı - orderId=" + orderId);
-            log.warn("Sipariş hiçbir strategy ile bulunamadı: orderId={}", orderId);
-
-            // Debug bilgisi yazdır
-            printDebugInfo(orderId);
-
-            return Optional.empty();
 
         } catch (Exception e) {
-            System.out.println("💥 getOrderById kritik hatası: " + e.getMessage());
-            log.error("Sipariş detayı getirme kritik hatası: orderId={}, error={}", orderId, e.getMessage(), e);
-            e.printStackTrace();
+            System.out.println("💥 getOrderById hatası: " + e.getMessage());
+            log.error("Sipariş detayı getirme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
             return Optional.empty();
         }
     }
 
     /**
-     * ✅ DEBUG: Detaylı debug bilgisi yazdır
+     * ✅ SIMPLIFIED DEBUG: Basit debug bilgisi
      */
-    private void printDebugInfo(Long searchId) {
+    private void printSimpleDebugInfo(Long searchId) {
         try {
-            System.out.println("=== DEBUG INFO ===");
+            System.out.println("=== SIMPLE DEBUG INFO ===");
 
             // Toplam sipariş sayısı
             long totalCount = stockOrderRepository.count();
             System.out.println("📊 Toplam sipariş sayısı: " + totalCount);
 
-            // Tüm ID'leri listele
-            List<Long> allIds = stockOrderRepository.debugGetAllIds();
-            System.out.println("📊 Tüm ID'ler (" + allIds.size() + "): " + allIds);
-
-            // Search ID'nin listede var olup olmadığını kontrol et
-            boolean inList = allIds.contains(searchId);
-            System.out.println("🔍 Search ID listede var mı: " + inList);
-
-            // ID range bilgisi
-            if (!allIds.isEmpty()) {
-                Long minId = allIds.stream().min(Long::compare).orElse(0L);
-                Long maxId = allIds.stream().max(Long::compare).orElse(0L);
-                System.out.println("📊 ID Aralığı: " + minId + " - " + maxId);
-                System.out.println("🔍 Search ID aralık içinde mi: " + (searchId >= minId && searchId <= maxId));
+            if (totalCount > 0) {
+                // İlk 3 sipariş ID'si
+                List<Long> firstIds = stockOrderRepository.debugGetAllIds().stream().limit(3).toList();
+                System.out.println("📊 İlk 3 ID: " + firstIds);
+                
+                // Search ID var mı kontrol
+                List<Long> allIds = stockOrderRepository.debugGetAllIds();
+                boolean exists = allIds.contains(searchId);
+                System.out.println("🔍 Search ID (" + searchId + ") exists: " + exists);
+                
+                if (!exists && !allIds.isEmpty()) {
+                    System.out.println("💡 Suggestion: Mevcut ID'lerden birini deneyin: " + allIds.get(0));
+                }
+            } else {
+                System.out.println("⚠️ Veritabanında hiç sipariş yok!");
             }
 
-            // İlk 5 siparişin detayları
-            List<StockOrder> sample = stockOrderRepository.findAll().stream().limit(5).toList();
-            System.out.println("📊 İlk 5 sipariş:");
-            sample.forEach(o -> System.out.println("   - ID: " + o.getId() +
-                    " (type: " + o.getId().getClass().getSimpleName() +
-                    "), OrderNumber: " + o.getOrderNumber() +
-                    ", Supplier: " + o.getSupplierName()));
-
         } catch (Exception debugEx) {
-            System.out.println("⚠️ Debug info yazdırılırken hata: " + debugEx.getMessage());
+            System.out.println("⚠️ Debug info hatası: " + debugEx.getMessage());
         }
     }
 
@@ -343,6 +277,39 @@ public class StockOrderService {
         } catch (Exception e) {
             log.error("DEBUG: Tüm siparişler getirme hatası: {}", e.getMessage(), e);
             return List.of();
+        }
+    }
+
+    /**
+     * ✅ DEBUG: Test siparişi oluştur (debug için)
+     */
+    @Transactional
+    public StockOrder createTestOrderForDebug() {
+        log.info("DEBUG: Test siparişi oluşturuluyor");
+
+        try {
+            // Test siparişi oluştur
+            StockOrder testOrder = StockOrder.builder()
+                    .orderNumber("TEST-" + System.currentTimeMillis())
+                    .supplierName("Test Supplier")
+                    .supplierContact("test@supplier.com")
+                    .expectedDeliveryDate(LocalDateTime.now().plusDays(7))
+                    .notes("Test siparişi - Debug amaçlı oluşturuldu")
+                    .createdBy("SYSTEM_DEBUG")
+                    .status(StockOrder.OrderStatus.PENDING)
+                    .totalAmount(BigDecimal.valueOf(100.00))
+                    .totalVat(BigDecimal.valueOf(18.00))
+                    .grandTotal(BigDecimal.valueOf(118.00))
+                    .build();
+
+            StockOrder savedOrder = stockOrderRepository.save(testOrder);
+            log.info("DEBUG: Test siparişi oluşturuldu - ID: {}, OrderNumber: {}", 
+                    savedOrder.getId(), savedOrder.getOrderNumber());
+
+            return savedOrder;
+        } catch (Exception e) {
+            log.error("DEBUG: Test siparişi oluşturma hatası: {}", e.getMessage(), e);
+            throw new RuntimeException("Test siparişi oluşturulamadı", e);
         }
     }
 
