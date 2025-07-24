@@ -1,7 +1,9 @@
 package com.d_tech.libsys.controller;
 
 import com.d_tech.libsys.domain.model.StockOrder;
+import com.d_tech.libsys.domain.model.Invoice; // ✅ ADDED
 import com.d_tech.libsys.repository.StockOrderRepository;
+import com.d_tech.libsys.repository.InvoiceRepository; // ✅ ADDED
 import com.d_tech.libsys.service.StockOrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * DEBUG Controller - Geliştirme aşamasında problemleri tespit etmek için
+ * 🚀 FIXED: DEBUG Controller - InvoiceRepository import eklendi
  */
 @RestController
 @RequestMapping("/api/debug")
@@ -25,6 +27,7 @@ public class DebugController {
 
     private final StockOrderService stockOrderService;
     private final StockOrderRepository stockOrderRepository;
+    private final InvoiceRepository invoiceRepository; // ✅ ADDED
 
     /**
      * Tüm stok siparişlerinin ID'lerini listele
@@ -145,6 +148,122 @@ public class DebugController {
     }
 
     /**
+     * 🚀 NEW: Invoice-Order relationship debug
+     */
+    @GetMapping("/invoices/{orderId}/debug")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> debugInvoiceOrderRelation(@PathVariable Long orderId) {
+        System.out.println("=== DEBUG: Invoice-Order İlişkisi ===");
+        System.out.println("🔍 Order ID: " + orderId);
+
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("orderId", orderId);
+
+        try {
+            // 1. Order var mı?
+            Optional<StockOrder> orderOpt = stockOrderService.getOrderById(orderId);
+            debug.put("orderExists", orderOpt.isPresent());
+
+            if (orderOpt.isPresent()) {
+                StockOrder order = orderOpt.get();
+                debug.put("orderNumber", order.getOrderNumber());
+                debug.put("orderStatus", order.getStatus().toString());
+                debug.put("orderTotal", order.getGrandTotal());
+
+                // 2. Order'ın faturası var mı? (Lazy loading test)
+                try {
+                    // ⚠️ Dikkat: Bu lazy loading exception verebilir
+                    Invoice orderInvoice = order.getInvoice();
+                    debug.put("orderHasInvoice", orderInvoice != null);
+                    if (orderInvoice != null) {
+                        debug.put("invoiceFromOrder", Map.of(
+                                "id", orderInvoice.getId(),
+                                "number", orderInvoice.getInvoiceNumber(),
+                                "total", orderInvoice.getGrandTotal()
+                        ));
+                    }
+                } catch (Exception e) {
+                    debug.put("orderInvoiceError", e.getMessage());
+                    debug.put("lazyLoadingFailed", true);
+                }
+            }
+
+            // 3. Repository'den direkt fatura arama
+            List<Invoice> allInvoices = invoiceRepository.findAll();
+            debug.put("totalInvoicesInDB", allInvoices.size());
+
+            // OrderId ile eşleşen faturaları bul
+            List<Invoice> matchingInvoices = allInvoices.stream()
+                    .filter(inv -> {
+                        try {
+                            return inv.getStockOrder() != null && inv.getStockOrder().getId().equals(orderId);
+                        } catch (Exception e) {
+                            return false; // Lazy loading exception durumunda false döndür
+                        }
+                    })
+                    .toList();
+
+            debug.put("matchingInvoicesCount", matchingInvoices.size());
+            debug.put("matchingInvoices", matchingInvoices.stream().map(inv -> {
+                try {
+                    return Map.of(
+                            "id", inv.getId(),
+                            "number", inv.getInvoiceNumber(),
+                            "orderId", inv.getStockOrder().getId()
+                    );
+                } catch (Exception e) {
+                    return Map.of(
+                            "id", inv.getId(),
+                            "number", inv.getInvoiceNumber(),
+                            "orderIdError", e.getMessage()
+                    );
+                }
+            }).toList());
+
+            // 4. Repository metodu test
+            Optional<Invoice> repoResult = invoiceRepository.findByStockOrderId(orderId);
+            debug.put("repositoryFindsInvoice", repoResult.isPresent());
+            if (repoResult.isPresent()) {
+                debug.put("repositoryInvoice", Map.of(
+                        "id", repoResult.get().getId(),
+                        "number", repoResult.get().getInvoiceNumber()
+                ));
+            }
+
+            // 5. Fatura listesi - detaylı
+            debug.put("allInvoiceDetails", allInvoices.stream().limit(10).map(inv -> {
+                Map<String, Object> invDetail = new HashMap<>();
+                invDetail.put("id", inv.getId());
+                invDetail.put("number", inv.getInvoiceNumber());
+                invDetail.put("supplierName", inv.getSupplierName());
+                invDetail.put("grandTotal", inv.getGrandTotal());
+
+                try {
+                    if (inv.getStockOrder() != null) {
+                        invDetail.put("stockOrderId", inv.getStockOrder().getId());
+                    } else {
+                        invDetail.put("stockOrderId", null);
+                    }
+                } catch (Exception e) {
+                    invDetail.put("stockOrderError", e.getMessage());
+                }
+
+                return invDetail;
+            }).toList());
+
+            System.out.println("✅ Debug analizi tamamlandı");
+            return ResponseEntity.ok(debug);
+
+        } catch (Exception e) {
+            System.out.println("💥 Debug hatası: " + e.getMessage());
+            e.printStackTrace();
+            debug.put("error", e.getMessage());
+            debug.put("errorType", e.getClass().getSimpleName());
+            return ResponseEntity.internalServerError().body(debug);
+        }
+    }
+
+    /**
      * Veritabanı bağlantı testi
      */
     @GetMapping("/database/connection")
@@ -177,73 +296,7 @@ public class DebugController {
     }
 
     /**
-     * Transaction durumu testi
-     */
-    @GetMapping("/transaction/test")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> testTransaction() {
-        System.out.println("=== DEBUG: Transaction testi ===");
-
-        Map<String, Object> result = new HashMap<>();
-
-        try {
-            // Transaction içinde okuma
-            List<StockOrder> orders = stockOrderService.getAllOrdersForDebug();
-            result.put("transactionReadOk", true);
-            result.put("ordersRead", orders.size());
-
-            System.out.println("✅ Transaction read OK - Okunan sipariş: " + orders.size());
-
-        } catch (Exception e) {
-            System.out.println("💥 Transaction test hatası: " + e.getMessage());
-            result.put("transactionReadOk", false);
-            result.put("error", e.getMessage());
-        }
-
-        return ResponseEntity.ok(result);
-    }
-
-    /**
-     * Hibernate session testi
-     */
-    @GetMapping("/hibernate/session")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> testHibernateSession() {
-        System.out.println("=== DEBUG: Hibernate session testi ===");
-
-        Map<String, Object> result = new HashMap<>();
-
-        try {
-            // Hibernate specific sorgu
-            List<StockOrder> orders = stockOrderRepository.findAll();
-            result.put("hibernateQueryOk", true);
-            result.put("ordersFound", orders.size());
-
-            if (!orders.isEmpty()) {
-                StockOrder firstOrder = orders.get(0);
-                result.put("firstOrderId", firstOrder.getId());
-                result.put("firstOrderIdType", firstOrder.getId().getClass().getSimpleName());
-
-                // Aynı ID ile tekrar arama
-                Optional<StockOrder> refound = stockOrderRepository.findById(firstOrder.getId());
-                result.put("refoundSameOrder", refound.isPresent());
-            }
-
-            System.out.println("✅ Hibernate session OK");
-
-        } catch (Exception e) {
-            System.out.println("💥 Hibernate session hatası: " + e.getMessage());
-            result.put("hibernateQueryOk", false);
-            result.put("error", e.getMessage());
-        }
-
-        return ResponseEntity.ok(result);
-    }
-
-    // DebugController.java dosyasına eklenecek yeni debug metodu:
-
-    /**
-     * 🚀 NEW: JSON Serialization Test
+     * JSON Serialization Test
      */
     @GetMapping("/json/test")
     @PreAuthorize("hasRole('ADMIN')")

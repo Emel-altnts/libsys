@@ -16,27 +16,52 @@ spring:
       max-lifetime: 1800000
       leak-detection-threshold: 60000
 
-  # JPA/Hibernate Yapılandırması - FIXED VERSION
+  # 🚀 FINAL FIX: JPA/Hibernate Yapılandırması - Lazy Loading kesin çözüm
   jpa:
+    # ✅ CRITICAL: Open Session in View - Lazy loading için MUTLAKA açık olmalı
+    open-in-view: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: true
     properties:
       hibernate:
+        # 🚀 CRITICAL FIX: Lazy loading no transaction workaround
+        enable_lazy_load_no_trans: true # ⚠️ Development için - Production'da kapatılmalı
+
+        # SQL formatting
         format_sql: true
         use_sql_comments: true
         generate_statistics: true
+
+        # 🚀 CONNECTION MANAGEMENT: Bağlantı yönetimi düzeltildi
+        connection:
+          provider_disables_autocommit: false
+
+        # 🚀 BATCH PROCESSING: Performans için
         jdbc:
           batch_size: 20
+          fetch_size: 50
         order_inserts: true
         order_updates: true
+
+        # 🚀 CACHING: Cache deaktif (lazy loading sorunları önlemek için)
         cache:
           use_second_level_cache: false
           use_query_cache: false
+
+        # 🚀 SESSION MANAGEMENT: Session yönetimi
         current_session_context_class: thread
+
+        # 🚀 ID GENERATION: ID üretimi
         id:
           new_generator_mappings: true
+
+        # 🚀 PROXY & LAZY LOADING: Lazy loading ayarları
+        proxy:
+          lazy_loading: true
+        bytecode:
+          use_reflection_optimizer: true
 
   # 🚀 FIXED: Kafka Yapılandırması - AUTO_COMMIT aktif
   kafka:
@@ -69,7 +94,7 @@ spring:
         poll-timeout: 3000
         missing-topics-fatal: false
 
-# Uygulama özel yapılandırmaları
+# 🚀 ENHANCED: Uygulama özel yapılandırmaları
 app:
   kafka:
     topic:
@@ -78,7 +103,20 @@ app:
       stock-order: stock-order-topic
       invoice: invoice-topic
 
-# Detaylı loglama yapılandırması
+  # 🚀 NEW: Transaction yönetimi ayarları
+  transaction:
+    timeout: 30 # seconds
+    isolation: READ_COMMITTED
+    propagation: REQUIRED
+
+  # 🚀 NEW: Lazy loading ayarları
+  jpa:
+    lazy-loading:
+      strategy: JOIN_FETCH # JOIN_FETCH, ENTITY_GRAPH, BATCH_FETCH
+      batch-size: 10
+      enable-no-trans-workaround: true # Sadece development için
+
+# 🚀 ENHANCED: Detaylı loglama yapılandırması
 logging:
   level:
     root: INFO
@@ -86,32 +124,103 @@ logging:
     com.d_tech.libsys.controller: DEBUG
     com.d_tech.libsys.service: DEBUG
     com.d_tech.libsys.repository: DEBUG
-    # Hibernate debug
+
+    # 🚀 HIBERNATE DEBUG: SQL ve lazy loading debug
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.type.descriptor.sql.BasicExtractor: TRACE
-    # Spring Data JPA debug
-    org.springframework.data.jpa: DEBUG
-    # Transaction debug
+    org.hibernate.engine.internal.StatefulPersistenceContext: DEBUG
+    org.hibernate.engine.loading: DEBUG
+
+    # 🚀 TRANSACTION DEBUG: Transaction debug
     org.springframework.transaction: DEBUG
     org.springframework.orm.jpa: DEBUG
-    # Kafka debug - daha az verbose
+    org.springframework.orm.jpa.JpaTransactionManager: DEBUG
+
+    # 🚀 SPRING DATA JPA DEBUG
+    org.springframework.data.jpa: DEBUG
+    org.springframework.data.repository: DEBUG
+
+    # 🚀 CONNECTION DEBUG: Database bağlantı debug
+    com.zaxxer.hikari.HikariConfig: DEBUG
+    com.zaxxer.hikari.pool.HikariPool: DEBUG
+
+    # 🚀 KAFKA DEBUG: Kafka debug (daha az verbose)
     org.springframework.kafka: INFO
     org.apache.kafka: WARN
+
+    # 🚀 PROXY DEBUG: Hibernate proxy debug
+    org.hibernate.proxy: DEBUG
+    org.hibernate.cfg.Environment: DEBUG
+
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/libsys-debug.log
+    max-size: 100MB
+    max-history: 30
 
-# Management endpoints
+# 🚀 ENHANCED: Management endpoints
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,loggers,beans,mappings,env
+        include: health,info,metrics,loggers,beans,mappings,env,httptrace,threaddump,heapdump
   endpoint:
     health:
       show-details: always
+      show-components: always
     loggers:
       enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles:
+        http.server.requests: 0.5, 0.9, 0.95, 0.99
+        jvm.gc.pause: 0.5, 0.9, 0.95, 0.99
+
+# 🚀 NEW: Debug ve development ayarları
+debug:
+  # Transaction debugging
+  transaction:
+    trace: true
+    show-rollback: true
+
+  # Lazy loading debugging
+  lazy-loading:
+    trace: true
+    show-proxy-creation: true
+
+  # Repository debugging
+  repository:
+    trace-queries: true
+    show-parameters: true
+
+  # Performance monitoring
+  performance:
+    enable-timing: true
+    log-slow-queries: true
+    slow-query-threshold: 1000 # milliseconds
+
+# 🚀 NEW: Development özel ayarlar
+development:
+  # Hızlı debug için
+  quick-debug:
+    enabled: true
+    auto-reload: true
+
+  # Test data
+  test-data:
+    create-sample: true
+    cleanup-on-start: false
+
+  # Performance profiling
+  profiling:
+    enabled: true
+    include-sql: true
+    include-transactions: true

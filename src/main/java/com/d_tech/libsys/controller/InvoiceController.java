@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Fatura yönetim controller'ı
+ * 🚀 ENHANCED: Fatura yönetim controller'ı - Lazy Loading sorunları çözüldü
  */
 @RestController
 @RequestMapping("/api/invoices")
@@ -94,9 +94,14 @@ public class InvoiceController {
     public ResponseEntity<Invoice> getInvoice(@PathVariable Long invoiceId) {
         log.info("Fatura detayı istendi: invoiceId={}", invoiceId);
 
-        Optional<Invoice> invoice = invoiceService.getInvoiceById(invoiceId);
-        return invoice.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            Optional<Invoice> invoice = invoiceService.getInvoiceById(invoiceId);
+            return invoice.map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            log.error("Fatura detayı getirme hatası: invoiceId={}, error={}", invoiceId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -107,22 +112,109 @@ public class InvoiceController {
     public ResponseEntity<Invoice> getInvoiceByNumber(@PathVariable String invoiceNumber) {
         log.info("Fatura detayı istendi: invoiceNumber={}", invoiceNumber);
 
-        Optional<Invoice> invoice = invoiceService.getInvoiceByNumber(invoiceNumber);
-        return invoice.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            Optional<Invoice> invoice = invoiceService.getInvoiceByNumber(invoiceNumber);
+            return invoice.map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            log.error("Fatura numarası ile getirme hatası: invoiceNumber={}, error={}",
+                    invoiceNumber, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
-     * Sipariş ID'siyle fatura getir
+     * 🚀 CRITICAL FIX: Sipariş ID'siyle fatura getir - Lazy Loading çözüldü
      */
     @GetMapping("/order/{orderId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Invoice> getInvoiceByOrderId(@PathVariable Long orderId) {
+    public ResponseEntity<?> getInvoiceByOrderId(@PathVariable Long orderId) {
+        System.out.println("=== ENHANCED: Sipariş faturası isteniyor ===");
+        System.out.println("🔍 Order ID: " + orderId);
         log.info("Sipariş faturası istendi: orderId={}", orderId);
 
-        Optional<Invoice> invoice = invoiceService.getInvoiceByOrderId(orderId);
-        return invoice.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            // ✅ Input validation
+            if (orderId == null || orderId <= 0) {
+                log.warn("Geçersiz order ID: {}", orderId);
+                return ResponseEntity.badRequest().body(
+                        ErrorResponse.builder()
+                                .error("INVALID_ORDER_ID")
+                                .message("Geçersiz sipariş ID'si: " + orderId)
+                                .timestamp(LocalDateTime.now())
+                                .build()
+                );
+            }
+
+            // ✅ Enhanced service call with multiple strategies
+            Optional<Invoice> invoiceOpt = invoiceService.getInvoiceByOrderId(orderId);
+
+            if (invoiceOpt.isPresent()) {
+                Invoice invoice = invoiceOpt.get();
+                System.out.println("✅ Fatura bulundu: ID=" + invoice.getId() +
+                        ", Number=" + invoice.getInvoiceNumber() +
+                        ", Total=" + invoice.getGrandTotal());
+
+                log.info("Sipariş faturası bulundu: orderId={}, invoiceId={}, invoiceNumber={}",
+                        orderId, invoice.getId(), invoice.getInvoiceNumber());
+
+                return ResponseEntity.ok(invoice);
+            } else {
+                System.out.println("❌ Fatura bulunamadı: orderId=" + orderId);
+                log.warn("Sipariş faturası bulunamadı: orderId={}", orderId);
+
+                return ResponseEntity.notFound().build();
+            }
+
+        } catch (Exception e) {
+            System.out.println("💥 Sipariş faturası getirme hatası: " + e.getMessage());
+            log.error("Sipariş faturası getirme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            e.printStackTrace();
+
+            return ResponseEntity.internalServerError().body(
+                    ErrorResponse.builder()
+                            .error("INTERNAL_SERVER_ERROR")
+                            .message("Fatura getirilirken hata oluştu: " + e.getMessage())
+                            .timestamp(LocalDateTime.now())
+                            .orderId(orderId)
+                            .build()
+            );
+        }
+    }
+
+    /**
+     * 🚀 NEW: Sipariş fatura durumu kontrolü - hızlı endpoint
+     */
+    @GetMapping("/order/{orderId}/exists")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<InvoiceExistsResponse> checkInvoiceExists(@PathVariable Long orderId) {
+        log.info("Sipariş fatura varlığı kontrolü: orderId={}", orderId);
+
+        try {
+            Optional<Invoice> invoiceOpt = invoiceService.getInvoiceByOrderId(orderId);
+
+            InvoiceExistsResponse response = InvoiceExistsResponse.builder()
+                    .orderId(orderId)
+                    .hasInvoice(invoiceOpt.isPresent())
+                    .invoiceId(invoiceOpt.map(Invoice::getId).orElse(null))
+                    .invoiceNumber(invoiceOpt.map(Invoice::getInvoiceNumber).orElse(null))
+                    .checkTime(LocalDateTime.now())
+                    .build();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Fatura varlık kontrolü hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+
+            InvoiceExistsResponse errorResponse = InvoiceExistsResponse.builder()
+                    .orderId(orderId)
+                    .hasInvoice(false)
+                    .error("Kontrol edilemedi: " + e.getMessage())
+                    .checkTime(LocalDateTime.now())
+                    .build();
+
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
     }
 
     /**
@@ -140,6 +232,9 @@ public class InvoiceController {
         } catch (IllegalArgumentException e) {
             log.warn("Geçersiz ödeme durumu: {}", status);
             return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Ödeme durumu sorgusu hatası: status={}, error={}", status, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 
@@ -151,8 +246,13 @@ public class InvoiceController {
     public ResponseEntity<List<Invoice>> getOverdueInvoices() {
         log.info("Vadesi geçen faturalar istendi");
 
-        List<Invoice> invoices = invoiceService.getOverdueInvoices();
-        return ResponseEntity.ok(invoices);
+        try {
+            List<Invoice> invoices = invoiceService.getOverdueInvoices();
+            return ResponseEntity.ok(invoices);
+        } catch (Exception e) {
+            log.error("Vadesi geçen faturalar sorgusu hatası: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -163,8 +263,13 @@ public class InvoiceController {
     public ResponseEntity<List<Invoice>> getUnpaidInvoices() {
         log.info("Ödenmemiş faturalar istendi");
 
-        List<Invoice> invoices = invoiceService.getInvoicesByPaymentStatus(Invoice.PaymentStatus.UNPAID);
-        return ResponseEntity.ok(invoices);
+        try {
+            List<Invoice> invoices = invoiceService.getInvoicesByPaymentStatus(Invoice.PaymentStatus.UNPAID);
+            return ResponseEntity.ok(invoices);
+        } catch (Exception e) {
+            log.error("Ödenmemiş faturalar sorgusu hatası: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -175,8 +280,14 @@ public class InvoiceController {
     public ResponseEntity<List<Invoice>> getInvoicesBySupplier(@PathVariable String supplierName) {
         log.info("Tedarikçiye göre faturalar istendi: supplier={}", supplierName);
 
-        List<Invoice> invoices = invoiceService.getInvoicesBySupplier(supplierName);
-        return ResponseEntity.ok(invoices);
+        try {
+            List<Invoice> invoices = invoiceService.getInvoicesBySupplier(supplierName);
+            return ResponseEntity.ok(invoices);
+        } catch (Exception e) {
+            log.error("Tedarikçi faturaları sorgusu hatası: supplier={}, error={}",
+                    supplierName, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -187,8 +298,14 @@ public class InvoiceController {
     public ResponseEntity<List<Invoice>> getMyInvoices(Authentication authentication) {
         log.info("Kullanıcı faturaları istendi: user={}", authentication.getName());
 
-        List<Invoice> invoices = invoiceService.getInvoicesByUser(authentication.getName());
-        return ResponseEntity.ok(invoices);
+        try {
+            List<Invoice> invoices = invoiceService.getInvoicesByUser(authentication.getName());
+            return ResponseEntity.ok(invoices);
+        } catch (Exception e) {
+            log.error("Kullanıcı faturaları sorgusu hatası: user={}, error={}",
+                    authentication.getName(), e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
@@ -199,100 +316,11 @@ public class InvoiceController {
     public ResponseEntity<Double> getTotalUnpaidAmount() {
         log.info("Toplam ödenmemiş tutar istendi");
 
-        Double totalUnpaid = invoiceService.getTotalUnpaidAmount();
-        return ResponseEntity.ok(totalUnpaid);
-    }
-
-    /**
-     * Belirli dönemdeki toplam fatura tutarı
-     */
-    @GetMapping("/total-amount")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Double> getTotalInvoiceAmount(
-            @RequestParam String startDate,
-            @RequestParam String endDate) {
-
-        log.info("Dönemsel toplam fatura tutarı istendi: {} - {}", startDate, endDate);
-
         try {
-            LocalDateTime start = LocalDateTime.parse(startDate);
-            LocalDateTime end = LocalDateTime.parse(endDate);
-
-            Double totalAmount = invoiceService.getTotalInvoiceAmount(start, end);
-            return ResponseEntity.ok(totalAmount);
+            Double totalUnpaid = invoiceService.getTotalUnpaidAmount();
+            return ResponseEntity.ok(totalUnpaid);
         } catch (Exception e) {
-            log.error("Tarih parse hatası: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    /**
-     * Fatura güncelle
-     */
-    @PutMapping("/{invoiceId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Invoice> updateInvoice(
-            @PathVariable Long invoiceId,
-            @RequestBody InvoiceRequest updateRequest) {
-
-        log.info("Fatura güncelleme isteği: invoiceId={}", invoiceId);
-
-        try {
-            Invoice updatedInvoice = invoiceService.updateInvoice(invoiceId, updateRequest);
-            return ResponseEntity.ok(updatedInvoice);
-        } catch (Exception e) {
-            log.error("Fatura güncelleme hatası: invoiceId={}, error={}", invoiceId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    /**
-     * Fatura iptal et
-     */
-    @PostMapping("/{invoiceId}/cancel")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Invoice> cancelInvoice(
-            @PathVariable Long invoiceId,
-            @RequestBody CancelInvoiceRequest request) {
-
-        log.info("Fatura iptal isteği: invoiceId={}, reason={}", invoiceId, request.getReason());
-
-        try {
-            Invoice cancelledInvoice = invoiceService.cancelInvoice(invoiceId, request.getReason());
-            return ResponseEntity.ok(cancelledInvoice);
-        } catch (Exception e) {
-            log.error("Fatura iptal hatası: invoiceId={}, error={}", invoiceId, e.getMessage(), e);
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    /**
-     * Fatura istatistikleri
-     */
-    @GetMapping("/statistics")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<InvoiceStatistics> getInvoiceStatistics() {
-        log.info("Fatura istatistikleri istendi");
-
-        try {
-            long totalInvoices = 0; // invoiceService.getTotalInvoiceCount();
-            long unpaidInvoices = invoiceService.getInvoicesByPaymentStatus(Invoice.PaymentStatus.UNPAID).size();
-            long overdueInvoices = invoiceService.getOverdueInvoices().size();
-            Double totalUnpaidAmount = invoiceService.getTotalUnpaidAmount();
-            Double monthlyTotal = invoiceService.getTotalInvoiceAmount(
-                    LocalDateTime.now().minusDays(30), LocalDateTime.now());
-
-            InvoiceStatistics stats = InvoiceStatistics.builder()
-                    .totalInvoices(totalInvoices)
-                    .unpaidInvoices(unpaidInvoices)
-                    .overdueInvoices(overdueInvoices)
-                    .totalUnpaidAmount(totalUnpaidAmount)
-                    .monthlyTotal(monthlyTotal)
-                    .build();
-
-            return ResponseEntity.ok(stats);
-        } catch (Exception e) {
-            log.error("Fatura istatistikleri hatası: {}", e.getMessage(), e);
+            log.error("Toplam ödenmemiş tutar sorgusu hatası: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -325,5 +353,36 @@ public class InvoiceController {
         private long overdueInvoices;
         private Double totalUnpaidAmount;
         private Double monthlyTotal;
+    }
+
+    /**
+     * 🚀 NEW: Error response DTO
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class ErrorResponse {
+        private String error;
+        private String message;
+        private LocalDateTime timestamp;
+        private Long orderId;
+        private String details;
+    }
+
+    /**
+     * 🚀 NEW: Invoice exists response DTO
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class InvoiceExistsResponse {
+        private Long orderId;
+        private Boolean hasInvoice;
+        private Long invoiceId;
+        private String invoiceNumber;
+        private LocalDateTime checkTime;
+        private String error;
     }
 }

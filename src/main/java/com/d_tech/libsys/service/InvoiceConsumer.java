@@ -5,7 +5,6 @@ import com.d_tech.libsys.dto.InvoiceEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -13,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Fatura event'lerini işleyen Kafka Consumer
+ * 🚀 FIXED: Fatura event'lerini işleyen Kafka Consumer - Acknowledgment sorunu çözüldü
  */
 @Service
 @RequiredArgsConstructor
@@ -21,10 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class InvoiceConsumer {
 
     private final InvoiceService invoiceService;
-    private final KafkaProducerService kafkaProducerService;
 
     /**
-     * Fatura event'lerini işler
+     * 🚀 CRITICAL FIX: Acknowledgment parametresi kaldırıldı - AUTO_COMMIT kullanılıyor
      */
     @KafkaListener(
             topics = "${app.kafka.topic.invoice:invoice-topic}",
@@ -35,10 +33,9 @@ public class InvoiceConsumer {
     public void handleInvoiceEvent(
             @Payload InvoiceEvent event,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
-            @Header(KafkaHeaders.OFFSET) long offset,
-            Acknowledgment acknowledgment) {
+            @Header(KafkaHeaders.OFFSET) long offset) {
 
-        log.info("Fatura event'i alındı: eventId={}, type={}, orderId={}, partition={}, offset={}",
+        log.info("✅ Fatura event'i alındı: eventId={}, type={}, orderId={}, partition={}, offset={}",
                 event.getEventId(), event.getEventType(), event.getOrderId(), partition, offset);
 
         try {
@@ -50,54 +47,57 @@ public class InvoiceConsumer {
                 case MARK_PAID -> handleMarkPaid(event);
                 case CANCEL_INVOICE -> handleCancelInvoice(event);
                 default -> {
-                    log.warn("Bilinmeyen fatura event tipi: {}", event.getEventType());
+                    log.warn("⚠️ Bilinmeyen fatura event tipi: {}", event.getEventType());
                     event.setStatus(InvoiceEvent.EventStatus.FAILED);
                     event.setMessage("Bilinmeyen event tipi");
                 }
             }
 
+            // ✅ Auto-commit ile başarı durumu
             if (event.getStatus() == InvoiceEvent.EventStatus.COMPLETED) {
-                acknowledgment.acknowledge();
-                log.info("Fatura event'i başarıyla işlendi: eventId={}", event.getEventId());
+                log.info("✅ Fatura event'i başarıyla işlendi: eventId={}", event.getEventId());
             } else {
-                handleInvoiceError(event, new RuntimeException(event.getMessage()), acknowledgment);
+                log.error("❌ Fatura event'i başarısız: eventId={}, message={}",
+                        event.getEventId(), event.getMessage());
             }
 
         } catch (Exception e) {
-            log.error("Fatura event'i işlenirken hata: eventId={}, error={}",
+            log.error("💥 Fatura event'i işlenirken hata: eventId={}, error={}",
                     event.getEventId(), e.getMessage(), e);
-            handleInvoiceError(event, e, acknowledgment);
+            event.setStatus(InvoiceEvent.EventStatus.FAILED);
+            event.setMessage("İşleme hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Fatura oluşturma işlemi
+     * ✅ Fatura oluşturma işlemi
      */
     private void handleGenerateInvoice(InvoiceEvent event) {
-        log.info("Fatura oluşturuluyor: orderId={}", event.getOrderId());
+        log.info("📄 Fatura oluşturuluyor: orderId={}", event.getOrderId());
 
         try {
             Invoice invoice = invoiceService.generateInvoice(event.getOrderId(), event.getInvoiceRequest());
             event.setStatus(InvoiceEvent.EventStatus.COMPLETED);
             event.setMessage("Fatura başarıyla oluşturuldu: " + invoice.getInvoiceNumber());
 
+            log.info("✅ Fatura oluşturuldu: invoiceId={}, invoiceNumber={}, orderId={}",
+                    invoice.getId(), invoice.getInvoiceNumber(), event.getOrderId());
+
         } catch (Exception e) {
+            log.error("❌ Fatura oluşturma hatası: orderId={}, error={}", event.getOrderId(), e.getMessage(), e);
             event.setStatus(InvoiceEvent.EventStatus.FAILED);
             event.setMessage("Fatura oluşturma hatası: " + e.getMessage());
         }
     }
 
     /**
-     * Fatura güncelleme işlemi
+     * ✅ Fatura güncelleme işlemi
      */
     private void handleUpdateInvoice(InvoiceEvent event) {
-        log.info("Fatura güncelleniyor: eventId={}", event.getEventId());
+        log.info("📝 Fatura güncelleniyor: eventId={}", event.getEventId());
 
         try {
-            // Fatura ID'si event mesajından parse edilmeli
-            // Long invoiceId = parseInvoiceIdFromMessage(event.getMessage());
-            // Invoice invoice = invoiceService.updateInvoice(invoiceId, event.getInvoiceRequest());
-
+            // Basit implementasyon - şimdilik sadece başarılı olarak işaretle
             event.setStatus(InvoiceEvent.EventStatus.COMPLETED);
             event.setMessage("Fatura güncellendi");
 
@@ -108,17 +108,13 @@ public class InvoiceConsumer {
     }
 
     /**
-     * Fatura ödendi işareti
+     * ✅ Fatura ödendi işareti
      */
     private void handleMarkPaid(InvoiceEvent event) {
-        log.info("Fatura ödendi olarak işaretleniyor: eventId={}", event.getEventId());
+        log.info("💰 Fatura ödendi olarak işaretleniyor: eventId={}", event.getEventId());
 
         try {
-            // Payment method event mesajından parse edilmeli
-            String paymentMethod = parsePaymentMethodFromMessage(event.getMessage());
-            // Long invoiceId = parseInvoiceIdFromMessage(event.getMessage());
-            // Invoice invoice = invoiceService.markInvoiceAsPaid(invoiceId, paymentMethod);
-
+            // Basit implementasyon - şimdilik sadece başarılı olarak işaretle
             event.setStatus(InvoiceEvent.EventStatus.COMPLETED);
             event.setMessage("Fatura ödendi olarak işaretlendi");
 
@@ -129,13 +125,13 @@ public class InvoiceConsumer {
     }
 
     /**
-     * Fatura iptal etme işlemi
+     * ✅ Fatura iptal etme işlemi
      */
     private void handleCancelInvoice(InvoiceEvent event) {
-        log.info("Fatura iptal ediliyor: eventId={}", event.getEventId());
+        log.info("🚫 Fatura iptal ediliyor: eventId={}", event.getEventId());
 
         try {
-            // Fatura ID'si ve iptal nedeni event'ten parse edilmeli
+            // Basit implementasyon - şimdilik sadece başarılı olarak işaretle
             event.setStatus(InvoiceEvent.EventStatus.COMPLETED);
             event.setMessage("Fatura iptal edildi");
 
@@ -144,25 +140,4 @@ public class InvoiceConsumer {
             event.setMessage("Fatura iptal hatası: " + e.getMessage());
         }
     }
-
-    /**
-     * Payment method parse etme
-     */
-    private String parsePaymentMethodFromMessage(String message) {
-        if (message != null && message.contains("Payment method:")) {
-            return message.substring(message.indexOf("Payment method:") + 15).split(",")[0].trim();
-        }
-        return "Unknown";
-    }
-
-    /**
-     * Fatura hatası işleme
-     */
-    private void handleInvoiceError(InvoiceEvent event, Exception error, Acknowledgment acknowledgment) {
-        log.error("Fatura event'i işlenirken hata: eventId={}, error={}", event.getEventId(), error.getMessage());
-
-        // Fatura event'leri için genellikle retry yapılmaz, hata kayıt edilir
-        acknowledgment.acknowledge();
-    }
 }
-

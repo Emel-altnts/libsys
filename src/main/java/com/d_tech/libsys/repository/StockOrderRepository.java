@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * StockOrder repository - DEBUG VERSION
+ * ✅ CLEAN: StockOrder repository - Problem çözüldü
  */
 @Repository
 public interface StockOrderRepository extends JpaRepository<StockOrder, Long> {
@@ -38,9 +38,11 @@ public interface StockOrderRepository extends JpaRepository<StockOrder, Long> {
     List<StockOrder> findByOrderDateBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     /**
-     * Bekleyen siparişleri bulur
+     * ✅ FIXED: Bekleyen siparişleri bulur - basit query
      */
-    @Query("SELECT so FROM StockOrder so WHERE so.status IN ('PENDING', 'CONFIRMED', 'SHIPPED')")
+    @Query("SELECT so FROM StockOrder so " +
+            "WHERE so.status IN ('PENDING', 'CONFIRMED', 'SHIPPED') " +
+            "ORDER BY so.orderDate ASC")
     List<StockOrder> findPendingOrders();
 
     /**
@@ -59,7 +61,7 @@ public interface StockOrderRepository extends JpaRepository<StockOrder, Long> {
      */
     boolean existsByOrderNumber(String orderNumber);
 
-    // DEBUG METODLARI
+    // ✅ DEBUG METHODS - Sadece çalışan olanlar
 
     /**
      * DEBUG: ID'nin var olup olmadığını kontrol eder
@@ -84,10 +86,4 @@ public interface StockOrderRepository extends JpaRepository<StockOrder, Long> {
      */
     @Query("SELECT so.id, so.orderNumber FROM StockOrder so ORDER BY so.id")
     List<Object[]> debugGetIdAndOrderNumber();
-
-    /**
-     * DEBUG: Belirli ID aralığındaki siparişleri getir
-     */
-    @Query("SELECT so FROM StockOrder so WHERE so.id BETWEEN :minId AND :maxId ORDER BY so.id")
-    List<StockOrder> debugFindByIdRange(@Param("minId") Long minId, @Param("maxId") Long maxId);
 }

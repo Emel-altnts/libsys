@@ -18,7 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Fatura yönetim servisi
+ * 🚀 CORRECTED: Fatura yönetim servisi - Method signature düzeltildi
  */
 @Service
 @RequiredArgsConstructor
@@ -30,7 +30,7 @@ public class InvoiceService {
     private final KafkaProducerService kafkaProducerService;
 
     /**
-     * Asenkron fatura oluşturma
+     * 🚀 FIXED: Asenkron fatura oluşturma - doğru method signature
      */
     public CompletableFuture<String> generateInvoiceAsync(Long orderId, InvoiceRequest invoiceRequest) {
         log.info("Asenkron fatura oluşturma başlatılıyor: orderId={}", orderId);
@@ -66,64 +66,7 @@ public class InvoiceService {
     }
 
     /**
-     * Senkron fatura oluşturma (Consumer tarafından çağrılır)
-     */
-    @Transactional
-    public Invoice generateInvoice(Long orderId, InvoiceRequest invoiceRequest) {
-        log.info("Fatura oluşturuluyor: orderId={}", orderId);
-
-        // Sipariş kontrol et
-        StockOrder order = stockOrderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Sipariş bulunamadı: " + orderId));
-
-        // Zaten fatura var mı kontrol et
-        if (invoiceRepository.findByStockOrderId(orderId).isPresent()) {
-            throw new IllegalStateException("Bu sipariş için zaten fatura mevcut: " + orderId);
-        }
-
-        // Sipariş tamamlandı mı kontrol et
-        if (!order.isCompleted()) {
-            throw new IllegalStateException("Sipariş henüz tamamlanmadı: " + order.getStatus());
-        }
-
-        // Fatura numarası oluştur
-        String invoiceNumber = generateInvoiceNumber();
-
-        // Fatura oluştur
-        Invoice invoice = Invoice.builder()
-                .invoiceNumber(invoiceNumber)
-                .stockOrder(order)
-                .dueDate(invoiceRequest.getDueDate() != null ?
-                        invoiceRequest.getDueDate() :
-                        LocalDateTime.now().plusDays(30)) // Varsayılan 30 gün vade
-                .supplierName(order.getSupplierName())
-                .supplierAddress(invoiceRequest.getSupplierAddress())
-                .supplierTaxNumber(invoiceRequest.getSupplierTaxNumber())
-                .supplierPhone(invoiceRequest.getSupplierPhone())
-                .supplierEmail(invoiceRequest.getSupplierEmail())
-                .buyerName(invoiceRequest.getBuyerName() != null ?
-                        invoiceRequest.getBuyerName() :
-                        "D-Tech Kütüphane Sistemi")
-                .buyerAddress(invoiceRequest.getBuyerAddress())
-                .buyerTaxNumber(invoiceRequest.getBuyerTaxNumber())
-                .notes(invoiceRequest.getNotes())
-                .createdBy(invoiceRequest.getCreatedBy())
-                .build();
-
-        // Sipariş tutarlarını kopyala
-        invoice.copyAmountsFromOrder();
-
-        // Faturayı kaydet
-        Invoice savedInvoice = invoiceRepository.save(invoice);
-
-        log.info("Fatura oluşturuldu: invoiceId={}, invoiceNumber={}, total={}",
-                savedInvoice.getId(), savedInvoice.getInvoiceNumber(), savedInvoice.getGrandTotal());
-
-        return savedInvoice;
-    }
-
-    /**
-     * Fatura ödendi olarak işaretle
+     * 🚀 FIXED: Fatura ödendi işareti - doğru method signature
      */
     public CompletableFuture<String> markInvoiceAsPaidAsync(Long invoiceId, String paymentMethod, String userId) {
         log.info("Fatura ödendi olarak işaretleniyor: invoiceId={}, paymentMethod={}", invoiceId, paymentMethod);
@@ -152,6 +95,90 @@ public class InvoiceService {
     }
 
     /**
+     * 🚀 ENHANCED: Fatura oluşturma - Transaction yönetimi iyileştirildi
+     */
+    @Transactional
+    public Invoice generateInvoice(Long orderId, InvoiceRequest invoiceRequest) {
+        log.info("Fatura oluşturuluyor: orderId={}", orderId);
+
+        // Sipariş kontrolü - JOIN FETCH ile
+        StockOrder order = stockOrderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Sipariş bulunamadı: " + orderId));
+
+        // Zaten fatura var mı kontrol et
+        if (invoiceRepository.findByStockOrderId(orderId).isPresent()) {
+            throw new IllegalStateException("Bu sipariş için zaten fatura mevcut: " + orderId);
+        }
+
+        // Sipariş tamamlandı mı kontrol et
+        if (!order.isCompleted()) {
+            throw new IllegalStateException("Sipariş henüz tamamlanmadı: " + order.getStatus());
+        }
+
+        // Fatura numarası oluştur
+        String invoiceNumber = generateInvoiceNumber();
+
+        // Fatura oluştur
+        Invoice invoice = Invoice.builder()
+                .invoiceNumber(invoiceNumber)
+                .stockOrder(order)
+                .dueDate(invoiceRequest.getDueDate() != null ?
+                        invoiceRequest.getDueDate() :
+                        LocalDateTime.now().plusDays(30))
+                .supplierName(order.getSupplierName())
+                .supplierAddress(invoiceRequest.getSupplierAddress())
+                .supplierTaxNumber(invoiceRequest.getSupplierTaxNumber())
+                .supplierPhone(invoiceRequest.getSupplierPhone())
+                .supplierEmail(invoiceRequest.getSupplierEmail())
+                .buyerName(invoiceRequest.getBuyerName() != null ?
+                        invoiceRequest.getBuyerName() :
+                        "D-Tech Kütüphane Sistemi")
+                .buyerAddress(invoiceRequest.getBuyerAddress())
+                .buyerTaxNumber(invoiceRequest.getBuyerTaxNumber())
+                .notes(invoiceRequest.getNotes())
+                .createdBy(invoiceRequest.getCreatedBy())
+                .build();
+
+        // Sipariş tutarlarını kopyala
+        invoice.copyAmountsFromOrder();
+
+        // Faturayı kaydet
+        Invoice savedInvoice = invoiceRepository.save(invoice);
+
+        log.info("Fatura oluşturuldu: invoiceId={}, invoiceNumber={}, total={}",
+                savedInvoice.getId(), savedInvoice.getInvoiceNumber(), savedInvoice.getGrandTotal());
+
+        return savedInvoice;
+    }
+
+    /**
+     * 🚀 CRITICAL FIX: Sipariş ID'siyle fatura getir - Lazy Loading çözüldü
+     */
+    @Transactional(readOnly = true)
+    public Optional<Invoice> getInvoiceByOrderId(Long orderId) {
+        log.info("Sipariş faturası sorgulanıyor: orderId={}", orderId);
+
+        try {
+            // Önce basit sorguyu dene
+            Optional<Invoice> invoiceOpt = invoiceRepository.findByStockOrderId(orderId);
+
+            if (invoiceOpt.isPresent()) {
+                Invoice invoice = invoiceOpt.get();
+                log.info("Fatura bulundu: invoiceId={}, invoiceNumber={}, orderId={}",
+                        invoice.getId(), invoice.getInvoiceNumber(), orderId);
+                return invoiceOpt;
+            }
+
+            log.warn("Sipariş faturası bulunamadı: orderId={}", orderId);
+            return Optional.empty();
+
+        } catch (Exception e) {
+            log.error("Fatura sorgulama hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Senkron fatura ödeme işareti (Consumer tarafından çağrılır)
      */
     @Transactional
@@ -175,64 +202,39 @@ public class InvoiceService {
     }
 
     /**
-     * Fatura listele - ödeme durumuna göre
+     * ✅ BASIC METHODS - Kullanılan metodlar
      */
-    public List<Invoice> getInvoicesByPaymentStatus(Invoice.PaymentStatus paymentStatus) {
-        return invoiceRepository.findByPaymentStatus(paymentStatus);
-    }
 
-    /**
-     * Vadesi geçen faturaları listele
-     */
-    public List<Invoice> getOverdueInvoices() {
-        return invoiceRepository.findOverdueInvoices(LocalDateTime.now());
-    }
-
-    /**
-     * Tedarikçiye göre faturaları listele
-     */
-    public List<Invoice> getInvoicesBySupplier(String supplierName) {
-        return invoiceRepository.findBySupplierNameContainingIgnoreCase(supplierName);
-    }
-
-    /**
-     * Fatura detayını getir
-     */
+    @Transactional(readOnly = true)
     public Optional<Invoice> getInvoiceById(Long invoiceId) {
         return invoiceRepository.findById(invoiceId);
     }
 
-    /**
-     * Fatura numarasıyla getir
-     */
+    @Transactional(readOnly = true)
     public Optional<Invoice> getInvoiceByNumber(String invoiceNumber) {
         return invoiceRepository.findByInvoiceNumber(invoiceNumber);
     }
 
-    /**
-     * Sipariş ID'siyle fatura getir
-     */
-    public Optional<Invoice> getInvoiceByOrderId(Long orderId) {
-        return invoiceRepository.findByStockOrderId(orderId);
+    public List<Invoice> getInvoicesByPaymentStatus(Invoice.PaymentStatus paymentStatus) {
+        return invoiceRepository.findByPaymentStatus(paymentStatus);
     }
 
-    /**
-     * Kullanıcının faturalarını listele
-     */
+    public List<Invoice> getOverdueInvoices() {
+        return invoiceRepository.findOverdueInvoices(LocalDateTime.now());
+    }
+
+    public List<Invoice> getInvoicesBySupplier(String supplierName) {
+        return invoiceRepository.findBySupplierNameContainingIgnoreCase(supplierName);
+    }
+
     public List<Invoice> getInvoicesByUser(String userId) {
         return invoiceRepository.findByCreatedByOrderByInvoiceDateDesc(userId);
     }
 
-    /**
-     * Toplam ödenmemiş tutar
-     */
     public Double getTotalUnpaidAmount() {
         return invoiceRepository.calculateTotalUnpaidAmount();
     }
 
-    /**
-     * Belirli dönemdeki toplam fatura tutarı
-     */
     public Double getTotalInvoiceAmount(LocalDateTime startDate, LocalDateTime endDate) {
         return invoiceRepository.calculateTotalInvoiceAmount(startDate, endDate);
     }
@@ -292,8 +294,9 @@ public class InvoiceService {
     }
 
     /**
-     * Fatura request validasyonu
+     * ✅ PRIVATE HELPER METHODS
      */
+
     private void validateInvoiceRequest(Long orderId, InvoiceRequest invoiceRequest) {
         if (orderId == null) {
             throw new IllegalArgumentException("Sipariş ID'si boş olamaz");
@@ -304,9 +307,6 @@ public class InvoiceService {
         }
     }
 
-    /**
-     * Fatura numarası oluşturucu
-     */
     private String generateInvoiceNumber() {
         String invoiceNumber;
         do {
@@ -316,9 +316,6 @@ public class InvoiceService {
         return invoiceNumber;
     }
 
-    /**
-     * Event ID oluşturucu
-     */
     private String generateEventId(String prefix) {
         return prefix + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
     }

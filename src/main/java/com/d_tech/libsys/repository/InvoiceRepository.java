@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Invoice repository
+ * ✅ SIMPLIFIED: Invoice repository - Sadece kullanılan metodlar
  */
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
@@ -22,7 +22,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     Optional<Invoice> findByInvoiceNumber(String invoiceNumber);
 
     /**
-     * Stok siparişine göre fatura bulur
+     * ✅ MAIN METHOD: Stok siparişine göre fatura bulur - Basit versiyon
      */
     Optional<Invoice> findByStockOrderId(Long stockOrderId);
 
