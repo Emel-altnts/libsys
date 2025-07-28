@@ -69,4 +69,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
      * Fatura numarası var mı kontrolü
      */
     boolean existsByInvoiceNumber(String invoiceNumber);
+
+    @Query("SELECT i FROM Invoice i WHERE i.id = :id")
+    Optional<Invoice> getByInvoiceId(@Param("id") Long id);
+
+
+
 }

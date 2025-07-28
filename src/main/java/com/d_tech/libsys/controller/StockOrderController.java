@@ -11,12 +11,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 🚀 FIXED: Stok sipariş yönetim controller'ı - JSON Serialization ve ID sorunları düzeltildi
+ * 🚀 UPDATED: Stok sipariş yönetim controller'ı - SHIPPED endpoint ve JSON fix eklendi
  */
 @RestController
 @RequestMapping("/api/stock/orders")
@@ -83,19 +84,59 @@ public class StockOrderController {
     }
 
     /**
-     * Sipariş teslimat alma
+     * 🚀 YENİ: Sipariş kargoya verme (CONFIRMED → SHIPPED)
+     */
+    @PostMapping("/{orderId}/ship")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AsyncResponse> shipOrderAsync(
+            @PathVariable Long orderId,
+            Authentication authentication) {
+
+        log.info("Sipariş kargoya verme isteği: orderId={}, user={}", orderId, authentication.getName());
+
+        try {
+            CompletableFuture<String> future = stockOrderService.shipOrderAsync(orderId, authentication.getName());
+            String eventId = future.get();
+
+            return ResponseEntity.accepted().body(new AsyncResponse(
+                    "Sipariş kargoya verme işlemi başlatıldı", eventId
+            ));
+
+        } catch (Exception e) {
+            log.error("Sipariş kargoya verme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(new AsyncResponse("Sipariş kargoya verme işlemi başlatılamadı", null));
+        }
+    }
+
+    /**
+     * 🚀 UPDATED: Sipariş teslimat alma - JSON format düzeltildi
      */
     @PostMapping("/{orderId}/receive")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AsyncResponse> receiveOrderAsync(
             @PathVariable Long orderId,
-            @RequestBody List<ReceiptItemRequest> receiptItems,
+            @RequestBody List<ReceiptItemRequest> receiptItems, // ✅ Direkt List, wrapper yok
             Authentication authentication) {
 
         log.info("Sipariş teslimat alma isteği: orderId={}, itemCount={}, user={}",
                 orderId, receiptItems.size(), authentication.getName());
 
         try {
+            // ✅ Önce sipariş durumunu kontrol et
+            Optional<StockOrder> orderOpt = stockOrderService.getOrderById(orderId);
+            if (orderOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            StockOrder order = orderOpt.get();
+            // ✅ CONFIRMED veya SHIPPED durumunda teslimat alınabilir
+            if (order.getStatus() != StockOrder.OrderStatus.CONFIRMED &&
+                    order.getStatus() != StockOrder.OrderStatus.SHIPPED) {
+                return ResponseEntity.badRequest().body(new AsyncResponse(
+                        "Sipariş bu durumda teslimat alınamaz: " + order.getStatus(), null));
+            }
+
             // ReceiptItemRequest'i StockReceiptItem'a çevir
             List<StockReceiptItem> stockReceiptItems = receiptItems.stream()
                     .map(item -> StockReceiptItem.builder()
@@ -117,6 +158,26 @@ public class StockOrderController {
             log.error("Sipariş teslimat alma hatası: orderId={}, error={}", orderId, e.getMessage(), e);
             return ResponseEntity.internalServerError()
                     .body(new AsyncResponse("Sipariş teslimat alma işlemi başlatılamadı", null));
+        }
+    }
+
+    /**
+     * 🚀 YENİ: Sipariş kalemlerini getir (OrderItems debug için)
+     */
+    @GetMapping("/{orderId}/items")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<OrderItemDto>> getOrderItems(@PathVariable Long orderId) {
+        log.info("Sipariş kalemleri istendi: orderId={}", orderId);
+
+        try {
+            List<OrderItemDto> items = stockOrderService.getOrderItemsForDelivery(orderId);
+            if (items.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(items);
+        } catch (Exception e) {
+            log.error("Sipariş kalemleri getirme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 
@@ -376,7 +437,7 @@ public class StockOrderController {
         }
     }
 
-    // DTO sınıfları
+    // 🚀 DTO sınıfları - Güncellenmiş
     @lombok.Data
     @lombok.AllArgsConstructor
     public static class AsyncResponse {
@@ -394,6 +455,25 @@ public class StockOrderController {
     @lombok.Data
     public static class CancelOrderRequest {
         private String reason;
+    }
+
+    /**
+     * 🚀 NEW: OrderItem DTO - Teslimat için
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class OrderItemDto {
+        private Long id;
+        private Long bookId;
+        private String bookTitle;
+        private String bookAuthor;
+        private Integer quantity;
+        private BigDecimal unitPrice;
+        private Integer receivedQuantity;
+        private String notes;
+        private BigDecimal subTotal;
     }
 
     /**

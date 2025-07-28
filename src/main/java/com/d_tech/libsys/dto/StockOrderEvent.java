@@ -6,12 +6,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * Stok sipariş event'i - Kafka için
+ * 🚀 UPDATED: Stok sipariş event'i - SHIP_ORDER eklendi
  */
 @Data
 @NoArgsConstructor
@@ -64,12 +62,13 @@ public class StockOrderEvent {
     private Integer retryCount = 0;
 
     /**
-     * Event tipi enum'u
+     * 🚀 UPDATED: Event tipi enum'u - SHIP_ORDER eklendi
      */
     public enum EventType {
         CREATE_ORDER,      // Sipariş oluştur
         UPDATE_ORDER,      // Sipariş güncelle
         CONFIRM_ORDER,     // Sipariş onayla
+        SHIP_ORDER,        // 🚀 YENİ: Sipariş kargoya ver (CONFIRMED → SHIPPED)
         CANCEL_ORDER,      // Sipariş iptal et
         RECEIVE_ORDER,     // Sipariş teslimat al
         GENERATE_INVOICE   // Fatura oluştur
@@ -85,12 +84,17 @@ public class StockOrderEvent {
         FAILED       // Başarısız
     }
 
+    /**
+     * Retry edilebilir mi kontrol eder
+     */
     public boolean canRetry() {
         return retryCount < 3;
     }
 
+    /**
+     * Retry sayısını artırır
+     */
     public void incrementRetry() {
         this.retryCount++;
     }
 }
-

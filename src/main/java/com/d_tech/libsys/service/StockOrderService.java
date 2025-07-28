@@ -1,5 +1,6 @@
 package com.d_tech.libsys.service;
 
+import com.d_tech.libsys.controller.StockOrderController;
 import com.d_tech.libsys.domain.model.*;
 import com.d_tech.libsys.dto.*;
 import com.d_tech.libsys.repository.*;
@@ -19,7 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Stok sipariş yönetim servisi - FIXED VERSION
+ * 🚀 UPDATED: Stok sipariş yönetim servisi - SHIPPED endpoint ve orderItems getirme eklendi
  */
 @Service
 @RequiredArgsConstructor
@@ -31,7 +32,7 @@ public class StockOrderService {
     private final BookRepository bookRepository;
     private final BookStockRepository bookStockRepository;
     private final KafkaProducerService kafkaProducerService;
-    private final EntityManager entityManager; // ✅ EntityManager injection eklendi
+    private final EntityManager entityManager;
 
     /**
      * Asenkron sipariş oluşturma
@@ -99,6 +100,35 @@ public class StockOrderService {
     }
 
     /**
+     * 🚀 YENİ: Sipariş kargoya verme (CONFIRMED → SHIPPED)
+     */
+    public CompletableFuture<String> shipOrderAsync(Long orderId, String userId) {
+        log.info("Sipariş kargoya verme başlatılıyor: orderId={}, userId={}", orderId, userId);
+
+        try {
+            StockOrderEvent event = StockOrderEvent.builder()
+                    .eventId(generateEventId("SHIP_ORDER"))
+                    .eventType(StockOrderEvent.EventType.SHIP_ORDER)
+                    .orderId(orderId)
+                    .build();
+
+            return kafkaProducerService.sendStockOrderEvent(event)
+                    .thenApply(success -> {
+                        if (success) {
+                            log.info("Sipariş kargoya verme event'i gönderildi: eventId={}", event.getEventId());
+                            return event.getEventId();
+                        } else {
+                            throw new RuntimeException("Sipariş kargoya verme event'i gönderilemedi");
+                        }
+                    });
+
+        } catch (Exception e) {
+            log.error("Sipariş kargoya verme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    /**
      * Sipariş teslimat alma
      */
     public CompletableFuture<String> receiveOrderAsync(Long orderId, List<StockReceiptItem> receiptItems, String userId) {
@@ -125,6 +155,46 @@ public class StockOrderService {
         } catch (Exception e) {
             log.error("Sipariş teslimat hatası: orderId={}, error={}", orderId, e.getMessage(), e);
             return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    /**
+     * 🚀 YENİ: Sipariş kalemlerini getir (teslimat için)
+     */
+    @Transactional(readOnly = true)
+    public List<StockOrderController.OrderItemDto> getOrderItemsForDelivery(Long orderId) {
+        log.info("Sipariş kalemleri getiriliyor: orderId={}", orderId);
+
+        try {
+            // Önce sipariş var mı kontrol et
+            if (!stockOrderRepository.existsById(orderId)) {
+                throw new IllegalArgumentException("Sipariş bulunamadı: " + orderId);
+            }
+
+            List<StockOrderItem> items = stockOrderItemRepository.findByStockOrderId(orderId);
+
+            if (items.isEmpty()) {
+                log.warn("Sipariş kalemleri bulunamadı: orderId={}", orderId);
+                return List.of();
+            }
+
+            return items.stream().map(item ->
+                    StockOrderController.OrderItemDto.builder()
+                            .id(item.getId())
+                            .bookId(item.getBook().getId())
+                            .bookTitle(item.getBook().getTitle())
+                            .bookAuthor(item.getBook().getAuthor())
+                            .quantity(item.getQuantity())
+                            .unitPrice(item.getUnitPrice())
+                            .receivedQuantity(item.getReceivedQuantity())
+                            .notes(item.getNotes())
+                            .subTotal(item.getSubTotal())
+                            .build()
+            ).toList();
+
+        } catch (Exception e) {
+            log.error("Sipariş kalemleri getirme hatası: orderId={}, error={}", orderId, e.getMessage(), e);
+            return List.of();
         }
     }
 
@@ -426,7 +496,28 @@ public class StockOrderService {
     }
 
     /**
-     * Sipariş teslimat alma (Consumer tarafından çağrılır)
+     * 🚀 YENİ: Sipariş kargoya verme (Consumer tarafından çağrılır)
+     */
+    @Transactional
+    public StockOrder shipOrder(Long orderId) {
+        log.info("Sipariş kargoya veriliyor: orderId={}", orderId);
+
+        StockOrder order = stockOrderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Sipariş bulunamadı: " + orderId));
+
+        if (order.getStatus() != StockOrder.OrderStatus.CONFIRMED) {
+            throw new IllegalStateException("Sipariş kargoya verilemez durumda: " + order.getStatus());
+        }
+
+        order.setStatus(StockOrder.OrderStatus.SHIPPED);
+        StockOrder savedOrder = stockOrderRepository.save(order);
+
+        log.info("Sipariş kargoya verildi: orderId={}, status={}", orderId, savedOrder.getStatus());
+        return savedOrder;
+    }
+
+    /**
+     * 🚀 UPDATED: Sipariş teslimat alma - CONFIRMED'dan da DELIVERED'a geçebilir
      */
     @Transactional
     public StockOrder receiveOrder(Long orderId, List<StockReceiptItem> receiptItems) {
@@ -435,7 +526,17 @@ public class StockOrderService {
         StockOrder order = stockOrderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Sipariş bulunamadı: " + orderId));
 
+        // ✅ CONFIRMED veya SHIPPED durumundan teslimat alınabilir
+        if (order.getStatus() != StockOrder.OrderStatus.CONFIRMED &&
+                order.getStatus() != StockOrder.OrderStatus.SHIPPED) {
+            throw new IllegalStateException("Sipariş teslimat alınamaz durumda: " + order.getStatus());
+        }
+
         List<StockOrderItem> orderItems = stockOrderItemRepository.findByStockOrderId(orderId);
+        if (orderItems.isEmpty()) {
+            throw new IllegalStateException("Sipariş kalemleri bulunamadı: " + orderId);
+        }
+
         boolean fullyReceived = true;
 
         // Her sipariş kalemi için teslimat güncelle
@@ -443,7 +544,9 @@ public class StockOrderService {
             StockOrderItem orderItem = orderItems.stream()
                     .filter(item -> item.getId().equals(receiptItem.getOrderItemId()))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Sipariş kalemi bulunamadı: " + receiptItem.getOrderItemId()));
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Sipariş kalemi bulunamadı: " + receiptItem.getOrderItemId() +
+                                    " (Mevcut IDs: " + orderItems.stream().map(StockOrderItem::getId).toList() + ")"));
 
             // Teslimat miktarını güncelle
             orderItem.setReceivedQuantity(receiptItem.getReceivedQuantity());

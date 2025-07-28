@@ -12,8 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * FIXED: Stok sipariş event'lerini işleyen Kafka Consumer
- * Acknowledgment sorunu çözüldü
+ * 🚀 UPDATED: Stok sipariş event'lerini işleyen Kafka Consumer - SHIP_ORDER handler eklendi
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +46,7 @@ public class StockOrderConsumer {
             switch (event.getEventType()) {
                 case CREATE_ORDER -> handleCreateOrder(event);
                 case CONFIRM_ORDER -> handleConfirmOrder(event);
+                case SHIP_ORDER -> handleShipOrder(event);  // 🚀 YENİ
                 case CANCEL_ORDER -> handleCancelOrder(event);
                 case RECEIVE_ORDER -> handleReceiveOrder(event);
                 case GENERATE_INVOICE -> handleGenerateInvoice(event);
@@ -116,6 +116,26 @@ public class StockOrderConsumer {
     }
 
     /**
+     * 🚀 YENİ: Sipariş kargoya verme işlemi (CONFIRMED → SHIPPED)
+     */
+    private void handleShipOrder(StockOrderEvent event) {
+        log.info("🚚 Sipariş kargoya veriliyor: orderId={}", event.getOrderId());
+
+        try {
+            StockOrder order = stockOrderService.shipOrder(event.getOrderId());
+            event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
+            event.setMessage("Sipariş kargoya verildi: " + order.getOrderNumber());
+
+            log.info("✅ Sipariş kargoya verildi: orderId={}, status={}", event.getOrderId(), order.getStatus());
+
+        } catch (Exception e) {
+            log.error("❌ Sipariş kargoya verme hatası: {}", e.getMessage(), e);
+            event.setStatus(StockOrderEvent.EventStatus.FAILED);
+            event.setMessage("Sipariş kargoya verme hatası: " + e.getMessage());
+        }
+    }
+
+    /**
      * ✅ Sipariş iptal etme işlemi
      */
     private void handleCancelOrder(StockOrderEvent event) {
@@ -142,11 +162,29 @@ public class StockOrderConsumer {
         log.info("📦 Sipariş teslimatı alınıyor: orderId={}", event.getOrderId());
 
         try {
-            // Basit implementasyon - tüm kalemleri tam teslimat kabul et
-            event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
-            event.setMessage("Sipariş teslimatı alındı");
+            // ✅ OrderItems'ları al ve tam teslimat olarak işaretle
+            var orderItems = stockOrderService.getOrderItemsForDelivery(event.getOrderId());
 
-            log.info("✅ Sipariş teslimatı kabul edildi: orderId={}", event.getOrderId());
+            if (orderItems.isEmpty()) {
+                throw new IllegalStateException("Sipariş kalemleri bulunamadı: " + event.getOrderId());
+            }
+
+            // Tüm kalemleri tam teslimat olarak işaretle
+            var receiptItems = orderItems.stream()
+                    .map(item -> com.d_tech.libsys.dto.StockReceiptItem.builder()
+                            .orderItemId(item.getId())
+                            .receivedQuantity(item.getQuantity()) // Tam teslimat
+                            .notes("Otomatik tam teslimat")
+                            .build())
+                    .toList();
+
+            StockOrder order = stockOrderService.receiveOrder(event.getOrderId(), receiptItems);
+            event.setStatus(StockOrderEvent.EventStatus.COMPLETED);
+            event.setMessage("Sipariş teslimatı alındı: " + order.getOrderNumber() +
+                    " (Status: " + order.getStatus() + ")");
+
+            log.info("✅ Sipariş teslimatı kabul edildi: orderId={}, status={}",
+                    event.getOrderId(), order.getStatus());
 
         } catch (Exception e) {
             log.error("❌ Teslimat alma hatası: {}", e.getMessage(), e);

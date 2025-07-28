@@ -18,7 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 🚀 CORRECTED: Fatura yönetim servisi - Method signature düzeltildi
+ * 🚀 UPDATED: Fatura yönetim servisi - DELIVERED kontrolü düzeltildi
  */
 @Service
 @RequiredArgsConstructor
@@ -95,13 +95,13 @@ public class InvoiceService {
     }
 
     /**
-     * 🚀 ENHANCED: Fatura oluşturma - Transaction yönetimi iyileştirildi
+     * 🚀 ENHANCED: Fatura oluşturma - DELIVERED kontrolü düzeltildi
      */
     @Transactional
     public Invoice generateInvoice(Long orderId, InvoiceRequest invoiceRequest) {
         log.info("Fatura oluşturuluyor: orderId={}", orderId);
 
-        // Sipariş kontrolü - JOIN FETCH ile
+        // Sipariş kontrolü
         StockOrder order = stockOrderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Sipariş bulunamadı: " + orderId));
 
@@ -110,9 +110,11 @@ public class InvoiceService {
             throw new IllegalStateException("Bu sipariş için zaten fatura mevcut: " + orderId);
         }
 
-        // Sipariş tamamlandı mı kontrol et
-        if (!order.isCompleted()) {
-            throw new IllegalStateException("Sipariş henüz tamamlanmadı: " + order.getStatus());
+        // ✅ DÜZELTME: Sipariş tamamlandı mı kontrol et - DELIVERED olmalı
+        if (order.getStatus() != StockOrder.OrderStatus.DELIVERED) {
+            throw new IllegalStateException(
+                    "Sipariş henüz teslim edilmedi, fatura oluşturulamaz. Mevcut durum: " + order.getStatus() +
+                            ". Fatura oluşturmak için sipariş durumu DELIVERED olmalıdır.");
         }
 
         // Fatura numarası oluştur
