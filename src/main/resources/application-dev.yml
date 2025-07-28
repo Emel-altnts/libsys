@@ -4,9 +4,9 @@ server:
 spring:
   # PostgreSQL Veritabanı Yapılandırması
   datasource:
-    url: jdbc:postgresql://localhost:5432/postgres
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://localhost:5439/postgres
+    username: myuser
+    password: mypassword
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
