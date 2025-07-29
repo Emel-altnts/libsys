@@ -1,4 +1,4 @@
-version: '3.8'
+
 services:
   # 🚀 ENHANCED: Zookeeper with health check
   zookeeper:
@@ -96,8 +96,6 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-      # 🚀 NEW: Custom PostgreSQL configuration
-      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
     command: >
       postgres 
       -c max_connections=100
@@ -121,7 +119,7 @@ services:
     networks:
       - kafka-network
 
-  # 🚀 CLEANED: Main application - Environment variables only
+  # 🚀 FIXED: Main application - Corrected DATABASE_URL format
   app:
     build:
       context: .
@@ -135,7 +133,7 @@ services:
       kafka:
         condition: service_healthy
     ports:
-      - "${PORT:-9090}:${PORT:-9090}"  # 🚀 Railway-compatible port mapping
+      - "${PORT:-9090}:${PORT:-9090}"
     networks:
       - kafka-network
     environment:
@@ -143,7 +141,7 @@ services:
       PORT: ${PORT:-9090}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
 
-      # 🚀 Database - Environment variables (Railway uyumlu)
+      # 🚀 CRITICAL FIX: Database URL must include 'jdbc:' prefix
       DATABASE_URL: jdbc:postgresql://postgres:5432/mydatabase
       PGUSER: myuser
       PGPASSWORD: mypassword
@@ -152,17 +150,10 @@ services:
       PGDATABASE: mydatabase
 
       # 🚀 Kafka - Environment variables (Railway/CloudKarafka uyumlu)
-      KAFKA_URL: kafka:29092  # Docker internal network
+      KAFKA_URL: kafka:29092
       KAFKA_SECURITY_PROTOCOL: PLAINTEXT
       KAFKA_GROUP_ID: libsys-group
       APP_KAFKA_ENABLED: true
-
-      # 🚀 NEW: Optional CloudKarafka override (for testing)
-      # KAFKA_URL: ${CLOUDKARAFKA_URL:-kafka:29092}
-      # KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
-      # KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-}
-      # KAFKA_SASL_JAAS_CONFIG: ${KAFKA_SASL_JAAS_CONFIG:-}
-      # KAFKA_TOPIC_PREFIX: ${KAFKA_TOPIC_PREFIX:-}
 
       # JVM options for container
       JAVA_OPTS: >
@@ -183,7 +174,6 @@ services:
     restart: unless-stopped
     volumes:
       - app_logs:/app/logs
-    # 🚀 NEW: Resource limits for development
     deploy:
       resources:
         limits:
@@ -211,7 +201,7 @@ services:
       - kafka-network
     restart: unless-stopped
     profiles:
-      - debug  # Only start with: docker-compose --profile debug up
+      - debug
 
   # 🚀 NEW: PostgreSQL Admin (optional)
   pgadmin:
@@ -232,9 +222,9 @@ services:
       - kafka-network
     restart: unless-stopped
     profiles:
-      - debug  # Only start with: docker-compose --profile debug up
+      - debug
 
-# 🚀 ENHANCED: Named volumes for data persistence
+# Volumes for data persistence
 volumes:
   pg_data:
     name: libsys_postgres_data
@@ -242,10 +232,10 @@ volumes:
     name: libsys_kafka_data
   app_logs:
     name: libsys_app_logs
-  pgadmin_data:
+  pgladmin_data:
     name: libsys_pgadmin_data
 
-# 🚀 ENHANCED: Custom network with specific configuration
+# Custom network
 networks:
   kafka-network:
     name: libsys_network
