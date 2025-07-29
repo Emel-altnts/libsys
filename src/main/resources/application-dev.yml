@@ -1,12 +1,12 @@
 server:
-  port: 9090
+  port: ${PORT:9090}  # 🚀 Railway uyumlu - environment'tan al, yoksa 9090
 
 spring:
-  # PostgreSQL Veritabanı Yapılandırması
+  # 🚀 UPDATED: PostgreSQL - Environment Variables Only
   datasource:
-    url: jdbc:postgresql://postgres:5432/mydatabase
-    username: myuser
-    password: mypassword
+    url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/mydatabase}
+    username: ${PGUSER:myuser}
+    password: ${PGPASSWORD:mypassword}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -63,9 +63,9 @@ spring:
         bytecode:
           use_reflection_optimizer: true
 
-  # 🚀 FIXED: Kafka Yapılandırması - AUTO_COMMIT aktif
+  # 🚀 UPDATED: Kafka Yapılandırması - Railway/CloudKarafka uyumlu
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_URL:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -75,8 +75,17 @@ spring:
       request-timeout-ms: 30000
       properties:
         enable.idempotence: false
+        # 🚀 CloudKarafka support - local'de PLAINTEXT, Railway'de SASL_SSL
+        security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+        sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
+        sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG:}
+        # SSL settings for CloudKarafka (local'de ignore edilir)
+        ssl.endpoint.identification.algorithm: ${KAFKA_SSL_ENDPOINT_ID:}
+        ssl.truststore.type: ${KAFKA_SSL_TRUSTSTORE_TYPE:}
+        ssl.check.hostname: ${KAFKA_SSL_CHECK_HOSTNAME:true}
+
     consumer:
-      group-id: libsys-group
+      group-id: ${KAFKA_GROUP_ID:libsys-group}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
@@ -87,6 +96,13 @@ spring:
         spring.json.trusted.packages: "com.d_tech.libsys.dto"
         spring.json.use.type.headers: false
         spring.json.value.default.type: "com.d_tech.libsys.dto.StockOrderEvent"
+        # 🚀 CloudKarafka support
+        security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+        sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
+        sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG:}
+        ssl.endpoint.identification.algorithm: ${KAFKA_SSL_ENDPOINT_ID:}
+        ssl.truststore.type: ${KAFKA_SSL_TRUSTSTORE_TYPE:}
+        ssl.check.hostname: ${KAFKA_SSL_CHECK_HOSTNAME:true}
       listener:
         # 🚀 CRITICAL FIX: ack-mode RECORD yapıldı (manual_immediate yerine)
         ack-mode: record
@@ -94,14 +110,16 @@ spring:
         poll-timeout: 3000
         missing-topics-fatal: false
 
-# 🚀 ENHANCED: Uygulama özel yapılandırmaları
+# 🚀 ENHANCED: Uygulama özel yapılandırmaları - Railway uyumlu
 app:
   kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}  # Railway'de false yapılabilir
     topic:
-      user-registration: user-registration-topic
-      stock-control: stock-control-topic
-      stock-order: stock-order-topic
-      invoice: invoice-topic
+      # 🚀 CloudKarafka topic prefix support
+      user-registration: ${KAFKA_TOPIC_USER_REGISTRATION:${KAFKA_TOPIC_PREFIX:}user-registration-topic}
+      stock-control: ${KAFKA_TOPIC_STOCK_CONTROL:${KAFKA_TOPIC_PREFIX:}stock-control-topic}
+      stock-order: ${KAFKA_TOPIC_STOCK_ORDER:${KAFKA_TOPIC_PREFIX:}stock-order-topic}
+      invoice: ${KAFKA_TOPIC_INVOICE:${KAFKA_TOPIC_PREFIX:}invoice-topic}
 
   # 🚀 NEW: Transaction yönetimi ayarları
   transaction:
@@ -145,9 +163,9 @@ logging:
     com.zaxxer.hikari.HikariConfig: DEBUG
     com.zaxxer.hikari.pool.HikariPool: DEBUG
 
-    # 🚀 KAFKA DEBUG: Kafka debug (daha az verbose)
-    org.springframework.kafka: INFO
-    org.apache.kafka: WARN
+    # 🚀 KAFKA DEBUG: Kafka debug (Railway'de daha az verbose)
+    org.springframework.kafka: ${KAFKA_LOG_LEVEL:INFO}
+    org.apache.kafka: ${KAFKA_LOG_LEVEL:WARN}
 
     # 🚀 PROXY DEBUG: Hibernate proxy debug
     org.hibernate.proxy: DEBUG

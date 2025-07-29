@@ -1,66 +1,257 @@
 version: '3.8'
 services:
+  # 🚀 ENHANCED: Zookeeper with health check
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1
+    image: confluentinc/cp-zookeeper:7.4.0
     container_name: libsys-zookeeper
     ports:
       - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - kafka-network
+    restart: unless-stopped
 
+  # 🚀 ENHANCED: Kafka with optimized settings
   kafka:
-    image: confluentinc/cp-kafka:7.0.1
+    image: confluentinc/cp-kafka:7.4.0
     container_name: libsys-kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # 🚀 UPDATED: Listener configuration for Docker networking
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_DOCKER://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_DOCKER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_DOCKER
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_DOCKER://0.0.0.0:29092
+
+      # Topic configuration
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
       KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+
+      # 🚀 NEW: Performance tuning
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"
+      KAFKA_JVM_PERFORMANCE_OPTS: "-XX:+UseG1GC -XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
+
+      # 🚀 NEW: Optimized settings for development
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+
+      # 🚀 NEW: Compression and batching
+      KAFKA_COMPRESSION_TYPE: snappy
+      KAFKA_BATCH_SIZE: 16384
+      KAFKA_LINGER_MS: 5
+
+      # Logging configuration
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
+
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - kafka-network
+    restart: unless-stopped
+    volumes:
+      - kafka_data:/var/lib/kafka/data
 
+  # 🚀 ENHANCED: PostgreSQL with optimized settings
   postgres:
-    image: postgres:16
-    container_name: my_postgres
-    restart: always
+    image: postgres:16-alpine
+    container_name: libsys_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: mydatabase
+      # 🚀 NEW: Performance tuning
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      # PostgreSQL configuration
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: pg_stat_statements
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
+      # 🚀 NEW: Custom PostgreSQL configuration
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: >
+      postgres 
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d mydatabase"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kafka-network
 
+  # 🚀 CLEANED: Main application - Environment variables only
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - SPRING_PROFILES_ACTIVE=dev
     container_name: libsys-app
     depends_on:
-      - postgres
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     ports:
-      - "9090:9090"
+      - "${PORT:-9090}:${PORT:-9090}"  # 🚀 Railway-compatible port mapping
     networks:
       - kafka-network
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mydatabase
-      SPRING_DATASOURCE_USERNAME: myuser
-      SPRING_DATASOURCE_PASSWORD: mypassword
+      # 🚀 Application settings
+      PORT: ${PORT:-9090}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
 
+      # 🚀 Database - Environment variables (Railway uyumlu)
+      DATABASE_URL: jdbc:postgresql://postgres:5432/mydatabase
+      PGUSER: myuser
+      PGPASSWORD: mypassword
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: mydatabase
+
+      # 🚀 Kafka - Environment variables (Railway/CloudKarafka uyumlu)
+      KAFKA_URL: kafka:29092  # Docker internal network
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      KAFKA_GROUP_ID: libsys-group
+      APP_KAFKA_ENABLED: true
+
+      # 🚀 NEW: Optional CloudKarafka override (for testing)
+      # KAFKA_URL: ${CLOUDKARAFKA_URL:-kafka:29092}
+      # KAFKA_SECURITY_PROTOCOL: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+      # KAFKA_SASL_MECHANISM: ${KAFKA_SASL_MECHANISM:-}
+      # KAFKA_SASL_JAAS_CONFIG: ${KAFKA_SASL_JAAS_CONFIG:-}
+      # KAFKA_TOPIC_PREFIX: ${KAFKA_TOPIC_PREFIX:-}
+
+      # JVM options for container
+      JAVA_OPTS: >
+        -Xmx512m 
+        -Xms256m 
+        -XX:+UseG1GC 
+        -XX:+UseContainerSupport 
+        -XX:MaxRAMPercentage=75
+        -Djava.security.egd=file:/dev/./urandom
+        -Dspring.profiles.active=dev
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${PORT:-9090}/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    volumes:
+      - app_logs:/app/logs
+    # 🚀 NEW: Resource limits for development
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # 🚀 NEW: Kafka UI for development (optional)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: libsys-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: libsys-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: true
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    profiles:
+      - debug  # Only start with: docker-compose --profile debug up
+
+  # 🚀 NEW: PostgreSQL Admin (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: libsys-pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@libsys.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - kafka-network
+    restart: unless-stopped
+    profiles:
+      - debug  # Only start with: docker-compose --profile debug up
+
+# 🚀 ENHANCED: Named volumes for data persistence
 volumes:
   pg_data:
+    name: libsys_postgres_data
+  kafka_data:
+    name: libsys_kafka_data
+  app_logs:
+    name: libsys_app_logs
+  pgadmin_data:
+    name: libsys_pgadmin_data
 
+# 🚀 ENHANCED: Custom network with specific configuration
 networks:
   kafka-network:
+    name: libsys_network
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: libsys0
