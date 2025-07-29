@@ -43,7 +43,20 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
 
-
+  app:
+    build: .
+    container_name: libsys-app
+    depends_on:
+      - postgres
+      - kafka
+    ports:
+      - "9090:9090"
+    networks:
+      - kafka-network
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mydatabase
+      SPRING_DATASOURCE_USERNAME: myuser
+      SPRING_DATASOURCE_PASSWORD: mypassword
 
 volumes:
   pg_data:
