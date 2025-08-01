@@ -2,56 +2,42 @@ server:
   port: ${PORT:8080}
 
 spring:
-  # Railway PostgreSQL connection
+  # H2 Database for easy ngrok demo (no external dependencies)
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/railway}
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 3
-      minimum-idle: 1
-      connection-timeout: 20000
-      idle-timeout: 300000
-      max-lifetime: 900000
-      leak-detection-threshold: 0
+    url: jdbc:h2:mem:libsys;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
 
   jpa:
-    open-in-view: true
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: false
     properties:
       hibernate:
         enable_lazy_load_no_trans: true
-        jdbc:
-          batch_size: 10
-          fetch_size: 25
-        order_inserts: true
-        order_updates: true
-        cache:
-          use_second_level_cache: false
-          use_query_cache: false
-        id:
-          new_generator_mappings: true
+        format_sql: false
 
-  # Upstash Kafka configuration
+  # Embedded Kafka for ngrok demo (no external Kafka needed)
   kafka:
-    bootstrap-servers: ${UPSTASH_KAFKA_ENDPOINT:localhost:9092}
+    bootstrap-servers: ${KAFKA_URL:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: 1
       retries: 3
       properties:
-        # Upstash Kafka SASL/SSL settings
-        security.protocol: ${UPSTASH_KAFKA_SECURITY_PROTOCOL:SASL_SSL}
-        sasl.mechanism: ${UPSTASH_KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
-        sasl.jaas.config: ${UPSTASH_KAFKA_SASL_JAAS_CONFIG:}
-        # SSL settings for Upstash
-        ssl.endpoint.identification.algorithm: https
-        ssl.truststore.type: JKS
+        enable.idempotence: true
     consumer:
-      group-id: ${UPSTASH_KAFKA_GROUP_ID:libsys-railway}
+      group-id: ${KAFKA_GROUP_ID:libsys-ngrok-group}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
@@ -59,41 +45,82 @@ spring:
       properties:
         spring.json.trusted.packages: "com.d_tech.libsys.dto"
         spring.json.use.type.headers: false
-        # Upstash Kafka SASL/SSL settings
-        security.protocol: ${UPSTASH_KAFKA_SECURITY_PROTOCOL:SASL_SSL}
-        sasl.mechanism: ${UPSTASH_KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
-        sasl.jaas.config: ${UPSTASH_KAFKA_SASL_JAAS_CONFIG:}
-        # SSL settings for Upstash
-        ssl.endpoint.identification.algorithm: https
-        ssl.truststore.type: JKS
 
 # Application configuration
 app:
   kafka:
-    enabled: ${KAFKA_ENABLED:false}
+    enabled: ${KAFKA_ENABLED:true}
     topic:
-      user-registration: ${UPSTASH_KAFKA_PREFIX:}user-registration-topic
-      stock-control: ${UPSTASH_KAFKA_PREFIX:}stock-control-topic
-      stock-order: ${UPSTASH_KAFKA_PREFIX:}stock-order-topic
-      invoice: ${UPSTASH_KAFKA_PREFIX:}invoice-topic
+      user-registration: user-registration-topic
+      stock-control: stock-control-topic
+      stock-order: stock-order-topic
+      invoice: invoice-topic
 
-# Logging - Railway optimized
+# JWT Configuration
+jwt:
+  secret: mySecretKey123456789012345678901234567890123456789012345678901234567890
+  expiration: 86400000
+
+# Logging - Optimized for ngrok demo
 logging:
   level:
     root: INFO
     com.d_tech.libsys: INFO
-    org.hibernate.SQL: WARN
-    org.springframework.kafka: { ${KAFKA_ENABLED:false} == 'true' ? INFO: OFF }
-    org.apache.kafka: OFF
+    org.springframework.kafka: WARN
+    org.apache.kafka: ERROR
+    org.hibernate: WARN
+    org.springframework.security: WARN
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
-# Management endpoints
+# Management endpoints - Full monitoring
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,env,beans,kafka
+      base-path: /actuator
   endpoint:
     health:
       show-details: always
+      show-components: always
+    info:
+      enabled: true
+  health:
+    kafka:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+# CORS Configuration for ngrok
+cors:
+  allowed-origins:
+    - "https://*.ngrok-free.app"
+    - "https://*.ngrok.io"
+    - "http://localhost:*"
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+
+# Application info
+info:
+  app:
+    name: LibSys Library Management System
+    description: Full Featured Library Management - Ngrok Ready
+    version: 1.0.0
+    features:
+      - JWT Authentication
+      - Book Management
+      - Stock Control with Kafka
+      - Order Management
+      - Invoice Generation
+      - Event Tracking
+      - Admin Dashboard
+    demo-mode: true
+    ngrok-ready: true
