@@ -1,0 +1,13 @@
+[phases.build]
+nixPkgs = ['maven', 'jdk17']
+cmds = [
+    'mvn clean package -DskipTests=true -Dspring.profiles.active=prod',
+    'ls -la target/'
+]
+
+[phases.start]
+cmd = 'java $JAVA_OPTS -Dserver.port=$PORT -Dspring.profiles.active=prod -jar target/libsys.jar'
+
+[variables]
+JAVA_OPTS = '-Xmx512m -Xms256m -XX:+UseG1GC -XX:+UseContainerSupport -XX:MaxRAMPercentage=75'
+SPRING_PROFILES_ACTIVE = 'prod'

@@ -10,6 +10,8 @@ import com.d_tech.libsys.service.AsyncUserService;
 import com.d_tech.libsys.service.UserService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,30 +21,34 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Authentication controller - kullanıcı giriş ve kayıt işlemlerini yönetir
- * Artık hem senkron hem de asenkron kayıt desteği var
+ * Authentication Controller - Railway Optimized
+ * Handles both sync and async user registration based on Kafka availability
  */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*", maxAge = 3600)
+@Slf4j
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
-    private final UserService userService; // Senkron servis
-    private final AsyncUserService asyncUserService; // Asenkron servis
+    private final UserService userService;
+    private final AsyncUserService asyncUserService;
+
+    @Value("${app.kafka.enabled:false}")
+    private boolean kafkaEnabled;
 
     /**
-     * Kullanıcı giriş endpoint'i
+     * User login endpoint
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest request) {
         try {
-            // Debug için log ekle
-            System.out.println("Login attempt for username: " + request.getUsername());
+            log.info("Login attempt for username: {}", request.getUsername());
 
-            // 1. Authentication işlemi
+            // Authentication
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getUsername(),
@@ -50,124 +56,175 @@ public class AuthController {
                     )
             );
 
-            // 2. Kullanıcı detaylarını al
+            // Load user details
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+            log.info("User found: {}, authorities: {}", userDetails.getUsername(), userDetails.getAuthorities());
 
-            // Debug için log ekle
-            System.out.println("User found: " + userDetails.getUsername());
-            System.out.println("User authorities: " + userDetails.getAuthorities());
-
-            // 3. JWT token oluştur
+            // Generate JWT token
             String token = jwtUtil.generateToken(userDetails.getUsername());
 
-            // 4. Başarılı yanıt döndür
             return ResponseEntity.ok(new AuthResponse("Bearer " + token));
 
         } catch (BadCredentialsException e) {
-            System.out.println("Bad credentials for username: " + request.getUsername());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+            log.warn("Bad credentials for username: {}", request.getUsername());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(createErrorResponse("Invalid credentials"));
         } catch (Exception e) {
-            System.out.println("Login error: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Login failed");
-        }
-    }
-
-    /**
-     * Asenkron kullanıcı kayıt endpoint'i (ÖNERİLEN)
-     * Kullanıcıyı bekletmez, Kafka üzerinden işlenir
-     */
-    @PostMapping("/signup-async")
-    public ResponseEntity<SignupResponse> signupAsync(@RequestBody SignupRequest request) {
-        try {
-            System.out.println("Asenkron kayıt isteği alındı: username=" + request.getUsername());
-
-            // Asenkron kayıt işlemini başlat
-            SignupResponse response = asyncUserService.registerUserAsync(request);
-
-            // Başarı durumunu kontrol et
-            if (response.getMessage().contains("alındı") || response.getMessage().contains("Event ID")) {
-                System.out.println("Asenkron kayıt isteği kabul edildi: username=" + request.getUsername());
-                return ResponseEntity.status(HttpStatus.ACCEPTED).body(response); // 202 Accepted
-            } else {
-                // Validasyon hatası vs.
-                System.out.println("Asenkron kayıt isteği reddedildi: username=" + request.getUsername() +
-                        " - " + response.getMessage());
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-            }
-
-        } catch (Exception e) {
-            System.out.println("Asenkron kayıt hatası: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Login error: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new SignupResponse("Kayıt isteği alınamadı. Lütfen tekrar deneyin."));
+                    .body(createErrorResponse("Login failed"));
         }
     }
 
     /**
-     * Senkron kullanıcı kayıt endpoint'i (GERİYE UYUMLULUK İÇİN)
-     * Eski sistemlerle uyumlu olmak için tutuldu
+     * User registration endpoint - chooses sync or async based on Kafka availability
      */
     @PostMapping("/signup")
     public ResponseEntity<SignupResponse> signup(@RequestBody SignupRequest request) {
+        log.info("Registration request: username={}, kafka={}", request.getUsername(), kafkaEnabled);
+
         try {
-            System.out.println("Senkron kayıt isteği alındı: username=" + request.getUsername());
+            SignupResponse response;
+            HttpStatus status;
 
-            // Senkron kayıt işlemini gerçekleştir
-            SignupResponse response = userService.registerUser(request);
-
-            // Başarı durumunu kontrol et
-            if (response.getMessage().contains("başarıyla")) {
-                System.out.println("Senkron kayıt başarılı: username=" + request.getUsername());
-                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            if (kafkaEnabled) {
+                // Async registration with Kafka
+                response = asyncUserService.registerUserAsync(request);
+                status = response.getMessage().contains("alındı") || response.getMessage().contains("Event ID")
+                        ? HttpStatus.ACCEPTED : HttpStatus.BAD_REQUEST;
             } else {
-                // Kayıt başarısız (validasyon hatası vs.)
-                System.out.println("Senkron kayıt başarısız: username=" + request.getUsername() +
-                        " - " + response.getMessage());
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+                // Sync registration without Kafka
+                response = userService.registerUser(request);
+                status = response.getMessage().contains("başarıyla")
+                        ? HttpStatus.CREATED : HttpStatus.BAD_REQUEST;
             }
 
+            log.info("Registration response: username={}, success={}",
+                    request.getUsername(), status.is2xxSuccessful());
+
+            return ResponseEntity.status(status).body(response);
+
         } catch (Exception e) {
-            System.out.println("Senkron kayıt hatası: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Registration error: username={}, error={}", request.getUsername(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new SignupResponse("Kayıt işlemi sırasında beklenmeyen bir hata oluştu!"));
         }
     }
 
     /**
-     * Kayıt durumu sorgulama endpoint'i
-     * Asenkron kayıt sonrası kullanıcı durumunu öğrenmek için
+     * Legacy async signup endpoint (for backward compatibility)
+     */
+    @PostMapping("/signup-async")
+    public ResponseEntity<SignupResponse> signupAsync(@RequestBody SignupRequest request) {
+        if (!kafkaEnabled) {
+            log.warn("Async signup requested but Kafka is disabled, falling back to sync");
+            return signup(request);
+        }
+
+        return signup(request); // Uses async internally when Kafka is enabled
+    }
+
+    /**
+     * Registration status check (only works with Kafka)
      */
     @GetMapping("/registration-status/{eventId}")
     public ResponseEntity<String> getRegistrationStatus(@PathVariable String eventId) {
-        try {
-            System.out.println("Kayıt durumu sorgulanıyor: eventId=" + eventId);
+        if (!kafkaEnabled) {
+            return ResponseEntity.ok("Kafka disabled - check user directly in database");
+        }
 
+        try {
+            log.info("Registration status query: eventId={}", eventId);
             String status = asyncUserService.getRegistrationStatus(eventId);
             return ResponseEntity.ok(status);
-
         } catch (Exception e) {
-            System.out.println("Kayıt durumu sorgulama hatası: " + e.getMessage());
+            log.error("Registration status query error: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Durum sorgulanamadı");
+                    .body("Status could not be retrieved");
         }
     }
 
     /**
-     * Kullanıcı adı kontrol endpoint'i (opsiyonel - frontend için kullanışlı)
+     * Username availability check
      */
     @GetMapping("/check-username/{username}")
-    public ResponseEntity<Boolean> checkUsername(@PathVariable String username) {
+    public ResponseEntity<UsernameCheckResponse> checkUsername(@PathVariable String username) {
         boolean exists = userService.existsByUsername(username);
-        return ResponseEntity.ok(exists);
+        return ResponseEntity.ok(new UsernameCheckResponse(exists, exists ? "Username taken" : "Username available"));
     }
 
     /**
-     * Sistem durumu endpoint'i
+     * System health check
      */
     @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Auth service is running");
+    public ResponseEntity<SystemStatusResponse> health() {
+        return ResponseEntity.ok(SystemStatusResponse.builder()
+                .status("UP")
+                .kafkaEnabled(kafkaEnabled)
+                .registrationMode(kafkaEnabled ? "ASYNC" : "SYNC")
+                .timestamp(System.currentTimeMillis())
+                .build());
+    }
+
+    /**
+     * API info endpoint
+     */
+    @GetMapping("/info")
+    public ResponseEntity<ApiInfoResponse> info() {
+        return ResponseEntity.ok(ApiInfoResponse.builder()
+                .applicationName("LibSys Library Management System")
+                .version("1.0.0")
+                .kafkaEnabled(kafkaEnabled)
+                .registrationMode(kafkaEnabled ? "ASYNC" : "SYNC")
+                .endpoints(java.util.List.of(
+                        "POST /api/auth/login - User login",
+                        "POST /api/auth/signup - User registration",
+                        "GET /api/auth/check-username/{username} - Check username availability",
+                        "GET /api/books - List all books",
+                        "GET /api/users - List users (Admin only)"
+                ))
+                .build());
+    }
+
+    // Helper methods and DTOs
+    private ErrorResponse createErrorResponse(String message) {
+        return new ErrorResponse(message, System.currentTimeMillis());
+    }
+
+    @lombok.Data
+    @lombok.AllArgsConstructor
+    public static class ErrorResponse {
+        private String error;
+        private long timestamp;
+    }
+
+    @lombok.Data
+    @lombok.AllArgsConstructor
+    public static class UsernameCheckResponse {
+        private boolean exists;
+        private String message;
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class SystemStatusResponse {
+        private String status;
+        private boolean kafkaEnabled;
+        private String registrationMode;
+        private long timestamp;
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class ApiInfoResponse {
+        private String applicationName;
+        private String version;
+        private boolean kafkaEnabled;
+        private String registrationMode;
+        private java.util.List<String> endpoints;
     }
 }
