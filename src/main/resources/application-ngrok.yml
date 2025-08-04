@@ -5,11 +5,15 @@ server:
   tomcat:
     max-threads: 200
     max-connections: 8192
+    connection-timeout: 20000
+    threads:
+      max: 200
+      min-spare: 10
 
 spring:
-  # H2 Database for ngrok demo (no external dependencies needed)
+  # ✅ H2 Database - Ngrok Ready (No External Dependencies)
   datasource:
-    url: jdbc:h2:mem:libsys_ngrok;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    url: jdbc:h2:mem:libsys_ngrok;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
     driver-class-name: org.h2.Driver
     username: libsys
     password: libsys123
@@ -17,6 +21,8 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
 
   h2:
     console:
@@ -30,14 +36,19 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
     show-sql: false
     properties:
       hibernate:
         enable_lazy_load_no_trans: true
         format_sql: false
         dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          time_zone: UTC
 
-  # Kafka disabled for ngrok simplicity (can be enabled if needed)
+  # ✅ KAFKA CONFIGURATION - Optional for ngrok
   kafka:
     bootstrap-servers: ${KAFKA_URL:localhost:9092}
     producer:
@@ -50,6 +61,7 @@ spring:
         max.in.flight.requests.per.connection: 1
         delivery.timeout.ms: 30000
         request.timeout.ms: 15000
+        retry.backoff.ms: 1000
     consumer:
       group-id: ${KAFKA_GROUP_ID:libsys-ngrok-group}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -61,49 +73,73 @@ spring:
         spring.json.use.type.headers: false
         session.timeout.ms: 15000
         heartbeat.interval.ms: 5000
+        max.poll.records: 500
+        max.poll.interval.ms: 300000
 
-# Application configuration - Ngrok optimized
+  # ✅ JACKSON Configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      write-durations-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+# ✅ APPLICATION CONFIGURATION
 app:
   kafka:
-    enabled: ${KAFKA_ENABLED:false}  # Disabled by default for simple ngrok demo
+    enabled: ${KAFKA_ENABLED:false}  # Ngrok için varsayılan false
     topic:
       user-registration: user-registration-topic
       stock-control: stock-control-topic
       stock-order: stock-order-topic
       invoice: invoice-topic
 
-# JWT Configuration
+  demo:
+    enabled: true
+    load-sample-data: true
+
+  ngrok:
+    ready: true
+    cors-enabled: true
+
+# ✅ JWT CONFIGURATION
 jwt:
-  secret: ${JWT_SECRET:NgrokLibSysSecretKey123456789012345678901234567890NgrokDemo}
+  secret: ${JWT_SECRET:NgrokLibSysSecretKey123456789012345678901234567890NgrokDemoSecureKey}
   expiration: 86400000  # 24 hours
 
-# Logging - Optimized for ngrok demo
+# ✅ LOGGING CONFIGURATION
 logging:
   level:
     root: INFO
     com.d_tech.libsys: INFO
-    org.springframework.security: WARN
+    org.springframework.security: INFO
     org.springframework.kafka: WARN
     org.apache.kafka: ERROR
     org.hibernate: WARN
-    org.springframework.web: DEBUG
+    org.springframework.web: INFO
+    org.springframework.boot.web.embedded.tomcat: INFO
   pattern:
-    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/libsys-ngrok.log
+    max-size: 10MB
+    max-history: 5
 
-# Management endpoints - Full monitoring for ngrok
+# ✅ MANAGEMENT ENDPOINTS - Full Monitoring
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,env,beans,loggers,threaddump,heapdump
+        include: health,info,metrics,env,beans,loggers,threaddump,heapdump,openapi,swagger-ui
       base-path: /actuator
       cors:
         allowed-origins: "*"
         allowed-methods: GET,POST,PUT,DELETE,OPTIONS
         allowed-headers: "*"
+        allow-credentials: true
   endpoint:
     health:
       show-details: always
@@ -112,9 +148,15 @@ management:
       enabled: true
     loggers:
       enabled: true
+    metrics:
+      enabled: true
   health:
     kafka:
       enabled: ${app.kafka.enabled:false}
+    diskspace:
+      enabled: true
+    db:
+      enabled: true
   info:
     env:
       enabled: true
@@ -122,29 +164,24 @@ management:
       enabled: true
     os:
       enabled: true
+    git:
+      enabled: true
+      mode: full
 
-# ✅ CRITICAL: CORS Configuration for ngrok and frontend
-spring.web.cors:
-  allowed-origins:
-    - "https://*.ngrok-free.app"
-    - "https://*.ngrok.io"
-    - "https://*.ngrok.com"
-    - "http://localhost:*"
-    - "https://localhost:*"
-    - "http://127.0.0.1:*"
-    - "https://127.0.0.1:*"
-  allowed-methods:
-    - GET
-    - POST
-    - PUT
-    - DELETE
-    - OPTIONS
-    - PATCH
-  allowed-headers: "*"
-  allow-credentials: true
-  max-age: 3600
+# ✅ SPRINGDOC OPENAPI CONFIGURATION
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  show-actuator: true
 
-# Application info - Ngrok Ready
+# ✅ APPLICATION INFO - Ngrok Ready
 info:
   app:
     name: "LibSys Library Management System"
@@ -153,25 +190,70 @@ info:
     contact:
       name: "D-Tech Development"
       email: "support@d-tech.com"
+      url: "https://github.com/d-tech/libsys"
+    license:
+      name: "MIT"
+      url: "https://opensource.org/licenses/MIT"
+
+    # ✅ FEATURES LIST
     features:
-      - "JWT Authentication"
-      - "Book Management with Images"
-      - "Stock Control System"
-      - "Order Management"
-      - "Invoice Generation"
-      - "Event Tracking"
-      - "Admin Dashboard"
-      - "Real-time Monitoring"
+      authentication: "JWT Authentication"
+      books: "Book Management with Images"
+      stock: "Stock Control System"
+      orders: "Order Management"
+      invoices: "Invoice Generation"
+      events: "Event Tracking"
+      admin: "Admin Dashboard"
+      monitoring: "Real-time Monitoring"
+      api-docs: "OpenAPI Documentation"
+
+    # ✅ DEMO CREDENTIALS
     demo-credentials:
       admin: "admin/admin (ADMIN role)"
       test: "test/123456 (USER role)"
+      frontend: "frontend/frontend123 (USER role)"
       manager: "manager/manager123 (ADMIN role)"
+
+    # ✅ API ENDPOINTS
+    api-endpoints:
+      swagger: "/swagger-ui.html"
+      api-docs: "/api-docs"
+      h2-console: "/h2-console"
+      actuator: "/actuator"
+      health: "/actuator/health"
+
+    # ✅ STATUS FLAGS
     ngrok-ready: true
     cors-enabled: true
     kafka-enabled: ${app.kafka.enabled:false}
-    database: "H2 In-Memory (Development Mode)"
+    database: "H2 In-Memory"
+    demo-mode: true
 
-# ✅ NEW: Custom application properties
+# ✅ SECURITY CONFIGURATION
+security:
+  cors:
+    allowed-origins:
+      - "https://*.ngrok-free.app"
+      - "https://*.ngrok.io"
+      - "https://*.ngrok.com"
+      - "https://*.ngrok.app"
+      - "http://localhost:*"
+      - "https://localhost:*"
+      - "http://127.0.0.1:*"
+      - "https://127.0.0.1:*"
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+      - PATCH
+      - HEAD
+    allowed-headers: "*"
+    allow-credentials: true
+    max-age: 3600
+
+# ✅ CUSTOM PROPERTIES
 application:
   security:
     cors:
@@ -186,3 +268,7 @@ application:
     ready: true
     features:
       all: true
+    cors:
+      enabled: true
+    monitoring:
+      enabled: true

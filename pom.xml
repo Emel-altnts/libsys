@@ -12,22 +12,25 @@
 	<artifactId>libsys</artifactId>
 	<version>1.0.0</version>
 	<name>libsys</name>
-	<description>Library Management System - Full Featured Ngrok Edition</description>
+	<description>Library Management System - Ngrok Ready Edition</description>
 
 	<properties>
-		<!-- ✅ FIXED: Java version format - removed 1.x prefix -->
+		<!-- ✅ FIXED: Java version configuration -->
 		<java.version>17</java.version>
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
 		<maven.compiler.release>17</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<!-- ✅ FIXED: Updated Lombok version for Java 17+ compatibility -->
+
+		<!-- ✅ CRITICAL: Updated versions for Java 17 compatibility -->
 		<lombok.version>1.18.30</lombok.version>
+		<spring-boot.version>3.2.5</spring-boot.version>
+		<junit.version>5.10.2</junit.version>
 	</properties>
 
 	<dependencies>
-		<!-- Core Spring Boot -->
+		<!-- Core Spring Boot Starters -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
@@ -53,20 +56,22 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
-		<!-- Database - H2 for easy ngrok demo, PostgreSQL for production -->
+		<!-- ✅ ENHANCED: Database Support -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
+			<version>2.2.224</version>
 			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
+			<version>42.7.3</version>
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- Kafka - Full Support -->
+		<!-- ✅ ENHANCED: Kafka Support -->
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka</artifactId>
@@ -78,22 +83,22 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- JWT - Stable versions for Java 17 -->
+		<!-- ✅ CRITICAL: JWT Dependencies - Updated for Java 17 -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
-			<version>0.11.5</version>
+			<version>0.12.5</version>
 		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-impl</artifactId>
-			<version>0.11.5</version>
+			<version>0.12.5</version>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-jackson</artifactId>
-			<version>0.11.5</version>
+			<version>0.12.5</version>
 			<scope>runtime</scope>
 		</dependency>
 
@@ -108,7 +113,7 @@
 			<artifactId>jackson-datatype-jsr310</artifactId>
 		</dependency>
 
-		<!-- ✅ FIXED: Lombok with explicit version and annotation processor -->
+		<!-- ✅ CRITICAL: Lombok - Fixed for Java 17 -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
@@ -116,7 +121,7 @@
 			<scope>provided</scope>
 		</dependency>
 
-		<!-- Test -->
+		<!-- Test Dependencies -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -128,14 +133,31 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- ✅ NEW: Additional Dependencies for Enhanced Features -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ✅ NEW: OpenAPI Documentation -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.4.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
 		<finalName>libsys</finalName>
 		<plugins>
+			<!-- ✅ CRITICAL: Spring Boot Plugin -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<version>${spring-boot.version}</version>
 				<configuration>
 					<excludes>
 						<exclude>
@@ -143,23 +165,36 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+					<!-- ✅ CRITICAL: JVM arguments for Java 17 -->
+					<jvmArguments>
+						--add-opens java.base/java.lang=ALL-UNNAMED
+						--add-opens java.base/java.util=ALL-UNNAMED
+						--add-opens java.base/java.time=ALL-UNNAMED
+						--add-opens java.base/java.net=ALL-UNNAMED
+					</jvmArguments>
 				</configuration>
 			</plugin>
 
-			<!-- ✅ FIXED: Maven compiler plugin with proper configuration -->
+			<!-- ✅ CRITICAL: Maven Compiler Plugin - Fixed for Java 17 -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.11.0</version>
+				<version>3.12.1</version>
 				<configuration>
 					<source>17</source>
 					<target>17</target>
 					<release>17</release>
 					<encoding>UTF-8</encoding>
+					<parameters>true</parameters>
 					<compilerArgs>
 						<arg>-parameters</arg>
 						<arg>-Xlint:unchecked</arg>
 						<arg>-Xlint:deprecation</arg>
+						<!-- ✅ CRITICAL: Java 17 specific arguments -->
+						<arg>--add-opens</arg>
+						<arg>java.base/java.lang=ALL-UNNAMED</arg>
+						<arg>--add-opens</arg>
+						<arg>java.base/java.util=ALL-UNNAMED</arg>
 					</compilerArgs>
 					<annotationProcessorPaths>
 						<path>
@@ -171,11 +206,11 @@
 				</configuration>
 			</plugin>
 
-			<!-- ✅ ENHANCED: Surefire plugin for tests -->
+			<!-- ✅ CRITICAL: Surefire Plugin - Java 17 Compatible -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.1.2</version>
+				<version>3.2.5</version>
 				<configuration>
 					<useSystemClassLoader>false</useSystemClassLoader>
 					<argLine>
@@ -183,11 +218,19 @@
 						--add-opens java.base/java.util=ALL-UNNAMED
 						--add-opens java.base/java.text=ALL-UNNAMED
 						--add-opens java.desktop/java.awt.font=ALL-UNNAMED
+						--add-opens java.base/java.time=ALL-UNNAMED
+						--add-opens java.base/java.net=ALL-UNNAMED
+						--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+						-XX:+AllowRedefinitionToAddDeleteMethods
 					</argLine>
+					<includes>
+						<include>**/*Test.java</include>
+						<include>**/*Tests.java</include>
+					</includes>
 				</configuration>
 			</plugin>
 
-			<!-- ✅ NEW: Resources plugin for proper encoding -->
+			<!-- ✅ ENHANCED: Resources Plugin -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-resources-plugin</artifactId>
@@ -196,10 +239,17 @@
 					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
+
+			<!-- ✅ NEW: Maven Wrapper Plugin -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-wrapper-plugin</artifactId>
+				<version>3.2.0</version>
+			</plugin>
 		</plugins>
 	</build>
 
-	<!-- ✅ NEW: Profiles for different environments -->
+	<!-- ✅ ENHANCED: Profiles for Different Environments -->
 	<profiles>
 		<profile>
 			<id>dev</id>
@@ -208,12 +258,23 @@
 			</activation>
 			<properties>
 				<spring.profiles.active>dev</spring.profiles.active>
+				<app.kafka.enabled>true</app.kafka.enabled>
 			</properties>
 		</profile>
+
 		<profile>
 			<id>ngrok</id>
 			<properties>
 				<spring.profiles.active>ngrok</spring.profiles.active>
+				<app.kafka.enabled>false</app.kafka.enabled>
+			</properties>
+		</profile>
+
+		<profile>
+			<id>prod</id>
+			<properties>
+				<spring.profiles.active>prod</spring.profiles.active>
+				<app.kafka.enabled>true</app.kafka.enabled>
 			</properties>
 		</profile>
 	</profiles>
