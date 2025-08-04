@@ -1,0 +1,188 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+  tomcat:
+    max-threads: 200
+    max-connections: 8192
+
+spring:
+  # H2 Database for ngrok demo (no external dependencies needed)
+  datasource:
+    url: jdbc:h2:mem:libsys_ngrok;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: libsys
+    password: libsys123
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+        trace: false
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        enable_lazy_load_no_trans: true
+        format_sql: false
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # Kafka disabled for ngrok simplicity (can be enabled if needed)
+  kafka:
+    bootstrap-servers: ${KAFKA_URL:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: 1
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 15000
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:libsys-ngrok-group}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: true
+      properties:
+        spring.json.trusted.packages: "com.d_tech.libsys.dto"
+        spring.json.use.type.headers: false
+        session.timeout.ms: 15000
+        heartbeat.interval.ms: 5000
+
+# Application configuration - Ngrok optimized
+app:
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}  # Disabled by default for simple ngrok demo
+    topic:
+      user-registration: user-registration-topic
+      stock-control: stock-control-topic
+      stock-order: stock-order-topic
+      invoice: invoice-topic
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:NgrokLibSysSecretKey123456789012345678901234567890NgrokDemo}
+  expiration: 86400000  # 24 hours
+
+# Logging - Optimized for ngrok demo
+logging:
+  level:
+    root: INFO
+    com.d_tech.libsys: INFO
+    org.springframework.security: WARN
+    org.springframework.kafka: WARN
+    org.apache.kafka: ERROR
+    org.hibernate: WARN
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/libsys-ngrok.log
+
+# Management endpoints - Full monitoring for ngrok
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,beans,loggers,threaddump,heapdump
+      base-path: /actuator
+      cors:
+        allowed-origins: "*"
+        allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+        allowed-headers: "*"
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    info:
+      enabled: true
+    loggers:
+      enabled: true
+  health:
+    kafka:
+      enabled: ${app.kafka.enabled:false}
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+# ✅ CRITICAL: CORS Configuration for ngrok and frontend
+spring.web.cors:
+  allowed-origins:
+    - "https://*.ngrok-free.app"
+    - "https://*.ngrok.io"
+    - "https://*.ngrok.com"
+    - "http://localhost:*"
+    - "https://localhost:*"
+    - "http://127.0.0.1:*"
+    - "https://127.0.0.1:*"
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+    - PATCH
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# Application info - Ngrok Ready
+info:
+  app:
+    name: "LibSys Library Management System"
+    description: "Full Featured Library Management - Ngrok Ready API"
+    version: "1.0.0"
+    contact:
+      name: "D-Tech Development"
+      email: "support@d-tech.com"
+    features:
+      - "JWT Authentication"
+      - "Book Management with Images"
+      - "Stock Control System"
+      - "Order Management"
+      - "Invoice Generation"
+      - "Event Tracking"
+      - "Admin Dashboard"
+      - "Real-time Monitoring"
+    demo-credentials:
+      admin: "admin/admin (ADMIN role)"
+      test: "test/123456 (USER role)"
+      manager: "manager/manager123 (ADMIN role)"
+    ngrok-ready: true
+    cors-enabled: true
+    kafka-enabled: ${app.kafka.enabled:false}
+    database: "H2 In-Memory (Development Mode)"
+
+# ✅ NEW: Custom application properties
+application:
+  security:
+    cors:
+      enabled: true
+      debug: true
+  demo:
+    data-loader:
+      enabled: true
+      create-sample-data: true
+    mode: true
+  ngrok:
+    ready: true
+    features:
+      all: true

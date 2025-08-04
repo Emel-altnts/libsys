@@ -15,11 +15,15 @@
 	<description>Library Management System - Full Featured Ngrok Edition</description>
 
 	<properties>
+		<!-- ✅ FIXED: Java version format - removed 1.x prefix -->
 		<java.version>17</java.version>
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
+		<maven.compiler.release>17</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<!-- ✅ FIXED: Updated Lombok version for Java 17+ compatibility -->
+		<lombok.version>1.18.30</lombok.version>
 	</properties>
 
 	<dependencies>
@@ -104,11 +108,12 @@
 			<artifactId>jackson-datatype-jsr310</artifactId>
 		</dependency>
 
-		<!-- Lombok -->
+		<!-- ✅ FIXED: Lombok with explicit version and annotation processor -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<optional>true</optional>
+			<version>${lombok.version}</version>
+			<scope>provided</scope>
 		</dependency>
 
 		<!-- Test -->
@@ -141,6 +146,7 @@
 				</configuration>
 			</plugin>
 
+			<!-- ✅ FIXED: Maven compiler plugin with proper configuration -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -148,18 +154,67 @@
 				<configuration>
 					<source>17</source>
 					<target>17</target>
+					<release>17</release>
 					<encoding>UTF-8</encoding>
+					<compilerArgs>
+						<arg>-parameters</arg>
+						<arg>-Xlint:unchecked</arg>
+						<arg>-Xlint:deprecation</arg>
+					</compilerArgs>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
 
+			<!-- ✅ ENHANCED: Surefire plugin for tests -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.0.0</version>
+				<version>3.1.2</version>
 				<configuration>
 					<useSystemClassLoader>false</useSystemClassLoader>
+					<argLine>
+						--add-opens java.base/java.lang=ALL-UNNAMED
+						--add-opens java.base/java.util=ALL-UNNAMED
+						--add-opens java.base/java.text=ALL-UNNAMED
+						--add-opens java.desktop/java.awt.font=ALL-UNNAMED
+					</argLine>
+				</configuration>
+			</plugin>
+
+			<!-- ✅ NEW: Resources plugin for proper encoding -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>3.3.1</version>
+				<configuration>
+					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
 		</plugins>
 	</build>
+
+	<!-- ✅ NEW: Profiles for different environments -->
+	<profiles>
+		<profile>
+			<id>dev</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<properties>
+				<spring.profiles.active>dev</spring.profiles.active>
+			</properties>
+		</profile>
+		<profile>
+			<id>ngrok</id>
+			<properties>
+				<spring.profiles.active>ngrok</spring.profiles.active>
+			</properties>
+		</profile>
+	</profiles>
 </project>
